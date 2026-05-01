@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CRAWLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-cd "$ROOT_DIR"
-go test ./crawler/backend/...
+cd "$CRAWLER_DIR/backend"
+go test ./...
 
-cd "$ROOT_DIR/crawler/frontend"
+cd "$CRAWLER_DIR/frontend"
 npm run build

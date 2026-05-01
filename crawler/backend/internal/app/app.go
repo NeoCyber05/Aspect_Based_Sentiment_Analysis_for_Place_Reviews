@@ -7,14 +7,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gosom/google-maps-scraper/web"
-	"github.com/gosom/google-maps-scraper/web/sqlite"
 	"golang.org/x/sync/errgroup"
+
+	"crawler/backend/internal/web"
+	"crawler/backend/internal/web/sqlite"
 )
 
 type App struct {
 	server *httpServer
 	worker *worker
+	closer interface{ Close() error }
 }
 
 func New(cfg *Config) (*App, error) {
@@ -30,9 +32,15 @@ func New(cfg *Config) (*App, error) {
 
 	svc := web.NewService(repo, cfg.DataFolder)
 
+	var closer interface{ Close() error }
+	if c, ok := repo.(interface{ Close() error }); ok {
+		closer = c
+	}
+
 	return &App{
 		server: newHTTPServer(svc, cfg),
 		worker: newWorker(svc, cfg),
+		closer: closer,
 	}, nil
 }
 
@@ -48,5 +56,12 @@ func (a *App) Run(ctx context.Context) error {
 		return a.worker.Run(runCtx)
 	})
 
-	return eg.Wait()
+	err := eg.Wait()
+	if a.closer != nil {
+		if closeErr := a.closer.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}
+
+	return err
 }

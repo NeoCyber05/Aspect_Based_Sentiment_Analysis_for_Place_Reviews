@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gosom/google-maps-scraper/web"
-	"github.com/gosom/google-maps-scraper/web/sqlite"
+	"crawler/backend/internal/web"
+	"crawler/backend/internal/web/sqlite"
 )
 
 func newTestHTTPServer(t *testing.T) (*httpServer, string) {
@@ -21,6 +21,14 @@ func newTestHTTPServer(t *testing.T) (*httpServer, string) {
 	repo, err := sqlite.New(filepath.Join(dataDir, "jobs.db"))
 	if err != nil {
 		t.Fatalf("sqlite.New() error: %v", err)
+	}
+
+	if closer, ok := repo.(interface{ Close() error }); ok {
+		t.Cleanup(func() {
+			if err := closer.Close(); err != nil {
+				t.Fatalf("failed to close sqlite repo: %v", err)
+			}
+		})
 	}
 
 	svc := web.NewService(repo, dataDir)

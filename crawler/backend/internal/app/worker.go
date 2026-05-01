@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosom/google-maps-scraper/deduper"
-	"github.com/gosom/google-maps-scraper/exiter"
-	"github.com/gosom/google-maps-scraper/runner"
-	"github.com/gosom/google-maps-scraper/web"
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/writers/csvwriter"
 	"github.com/gosom/scrapemate/scrapemateapp"
+
+	"crawler/backend/internal/deduper"
+	"crawler/backend/internal/exiter"
+	"crawler/backend/internal/runner"
+	"crawler/backend/internal/web"
 )
 
 type worker struct {

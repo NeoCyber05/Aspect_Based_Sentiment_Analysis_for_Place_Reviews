@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gosom/google-maps-scraper/web"
+
+	"crawler/backend/internal/web"
 )
 
 type httpServer struct {

@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gosom/google-maps-scraper/crawler/backend/internal/app"
+	"crawler/backend/internal/app"
 )
 
 func main() {

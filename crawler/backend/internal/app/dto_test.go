@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosom/google-maps-scraper/web"
+	"crawler/backend/internal/web"
 )
 
 func TestCreateJobRequestValidate(t *testing.T) {
