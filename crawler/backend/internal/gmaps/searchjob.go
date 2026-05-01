@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -78,6 +79,35 @@ func WithSearchJobWriterManagedCompletion() SearchJobOptions {
 
 func (j *SearchJob) ProcessOnFetchError() bool {
 	return true
+}
+
+func (j *SearchJob) BrowserActions(ctx context.Context, _ scrapemate.BrowserPage) scrapemate.Response {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.GetFullURL(), nil)
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", j.params.Hl)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+
+	return scrapemate.Response{
+		StatusCode: resp.StatusCode,
+		Headers:    resp.Header,
+		Body:       body,
+		URL:        j.GetFullURL(),
+	}
 }
 
 func (j *SearchJob) Process(_ context.Context, resp *scrapemate.Response) (any, []scrapemate.IJob, error) {

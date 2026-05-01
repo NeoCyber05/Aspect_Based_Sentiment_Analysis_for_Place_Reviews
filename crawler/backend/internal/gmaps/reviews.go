@@ -363,10 +363,20 @@ func extractReviewsFromPage(ctx context.Context, page scrapemate.BrowserPage) ([
 	// First, try to click the reviews section to open the reviews panel
 	clickedReviews, _ := page.Eval(`() => {
 		try {
+			const normalizeText = (value) => (value || '')
+				.toLowerCase()
+				.normalize('NFD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.replace(/đ/g, 'd');
+			const hasReviewText = (value) => {
+				const text = normalizeText(value);
+				return text.includes('review') || text.includes('danh gia');
+			};
+
 			// Method 1: Click on the reviews count/link in the place info
 			const reviewsButtons = document.querySelectorAll('button[jsaction*="reviewChart"], button[jsaction*="reviews"]');
 			for (const btn of reviewsButtons) {
-				if (btn.textContent.includes('review') || btn.getAttribute('aria-label')?.includes('review')) {
+				if (hasReviewText(btn.textContent) || hasReviewText(btn.getAttribute('aria-label'))) {
 					btn.click();
 					return 'reviews_button';
 				}
@@ -376,27 +386,27 @@ func extractReviewsFromPage(ctx context.Context, page scrapemate.BrowserPage) ([
 			const tabs = document.querySelectorAll('button[role="tab"]');
 			for (const tab of tabs) {
 				const label = tab.getAttribute('aria-label') || tab.textContent || '';
-				if (label.toLowerCase().includes('review')) {
+				if (hasReviewText(label)) {
 					tab.click();
 					return 'reviews_tab';
 				}
 			}
 
-			// Method 3: Click the star rating area which often opens reviews
+			// Method 3: Look for "See all reviews" or similar localized links
+			const allLinks = document.querySelectorAll('a, button');
+			for (const link of allLinks) {
+				const label = (link.textContent || '') + ' ' + (link.getAttribute('aria-label') || '');
+				if (hasReviewText(label)) {
+					link.click();
+					return 'all_reviews_link';
+				}
+			}
+
+			// Method 4: Click the star rating area which often opens reviews
 			const ratingArea = document.querySelector('.F7nice, .fontDisplayLarge');
 			if (ratingArea) {
 				ratingArea.click();
 				return 'rating_area';
-			}
-
-			// Method 4: Look for "See all reviews" or similar links
-			const allLinks = document.querySelectorAll('a, button');
-			for (const link of allLinks) {
-				const text = link.textContent?.toLowerCase() || '';
-				if (text.includes('all review') || text.includes('see review') || text.includes('more review')) {
-					link.click();
-					return 'all_reviews_link';
-				}
 			}
 
 			return false;
@@ -457,7 +467,7 @@ func extractReviewsFromPage(ctx context.Context, page scrapemate.BrowserPage) ([
 					// Look for elements that look like reviews (have rating + text)
 					const allDivs = document.querySelectorAll('div[class]');
 					for (const div of allDivs) {
-						const hasRating = div.querySelector('[aria-label*="star"], [role="img"][aria-label*="star"]');
+						const hasRating = div.querySelector('[aria-label*="star"], [aria-label*="sao"], [role="img"][aria-label*="star"], [role="img"][aria-label*="sao"]');
 						const hasText = div.querySelector('span.wiI7pd, span[class*="review"]');
 						if (hasRating && hasText && !reviewElements.includes(div)) {
 							reviewElements.push(div);
@@ -513,6 +523,8 @@ func extractReviewsFromPage(ctx context.Context, page scrapemate.BrowserPage) ([
 							'.kvMYJc',
 							'.DU9Pgb span[aria-label]',
 							'[role="img"][aria-label*="star"]',
+							'[role="img"][aria-label*="sao"]',
+							'[aria-label*="sao"]',
 							'.pjemBf span',
 							'.review-score',
 						];

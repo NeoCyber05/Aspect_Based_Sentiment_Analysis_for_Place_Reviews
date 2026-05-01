@@ -119,6 +119,12 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 	if ok && len(domReviews) > 0 {
 		convertedReviews := ConvertDOMReviewsToReviews(domReviews)
 		entry.UserReviewsExtended = append(entry.UserReviewsExtended, convertedReviews...)
+		if len(entry.UserReviews) == 0 {
+			entry.UserReviews = append(entry.UserReviews, convertedReviews...)
+		}
+		if entry.ReviewCount == 0 {
+			entry.ReviewCount = len(entry.UserReviewsExtended)
+		}
 	}
 
 	if j.ExtractEmail && entry.IsWebsiteValidForEmail() {
@@ -282,9 +288,13 @@ func (j *PlaceJob) extractJSON(page scrapemate.BrowserPage) ([]byte, error) {
 }
 
 func (j *PlaceJob) getReviewCount(data []byte) int {
-	tmpEntry, err := EntryFromJSON(data, true)
+	tmpEntry, err := EntryFromJSON(data)
 	if err != nil {
 		return 0
+	}
+
+	if tmpEntry.ReviewCount == 0 && tmpEntry.ReviewRating > 0 {
+		return 1
 	}
 
 	return tmpEntry.ReviewCount

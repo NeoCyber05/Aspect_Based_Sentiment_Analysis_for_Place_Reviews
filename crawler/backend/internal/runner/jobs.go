@@ -36,7 +36,8 @@ func CreateSeedJobs(
 		return nil, fmt.Errorf("url mode cannot be used together with fast mode")
 	}
 
-	if fastmode {
+	hasGeoCoordinates := strings.TrimSpace(geoCoordinates) != ""
+	if fastmode || hasGeoCoordinates {
 		if geoCoordinates == "" {
 			return nil, fmt.Errorf("geo coordinates are required in fast mode")
 		}
@@ -97,7 +98,7 @@ func CreateSeedJobs(
 			}
 
 			job = gmaps.NewPlaceJob(q.id, langCode, placeURL, email, extraReviews, opts...)
-		} else if !fastmode {
+		} else if !fastmode && !hasGeoCoordinates {
 			opts := []gmaps.GmapJobOptions{}
 			if dedup != nil {
 				opts = append(opts, gmaps.WithDeduper(dedup))

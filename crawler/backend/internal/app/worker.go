@@ -73,13 +73,16 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 	if err != nil {
 		return err
 	}
-	defer outfile.Close()
+	shouldCloseOutput := true
+	defer func() {
+		if shouldCloseOutput {
+			_ = outfile.Close()
+		}
+	}()
 
 	mate, err := w.setupMate(outfile, job)
 	if err != nil {
-		job.Status = web.StatusFailed
-		_ = w.svc.Update(ctx, job)
-		return err
+		return w.failJob(ctx, job, err)
 	}
 	defer mate.Close()
 
@@ -111,9 +114,7 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 		w.cfg.ExtraReviews || job.Data.ExtraReviews,
 	)
 	if err != nil {
-		job.Status = web.StatusFailed
-		_ = w.svc.Update(ctx, job)
-		return err
+		return w.failJob(ctx, job, err)
 	}
 
 	if len(seedJobs) > 0 {
@@ -135,14 +136,35 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 
 		err = mate.Start(mateCtx, seedJobs...)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			job.Status = web.StatusFailed
-			_ = w.svc.Update(ctx, job)
-			return err
+			return w.failJob(ctx, job, err)
 		}
+	}
+
+	if err := outfile.Close(); err != nil {
+		return w.failJob(ctx, job, err)
+	}
+	shouldCloseOutput = false
+
+	info, err := os.Stat(outpath)
+	if err != nil {
+		return w.failJob(ctx, job, err)
+	}
+
+	if info.Size() == 0 {
+		return w.failJob(ctx, job, fmt.Errorf("crawler finished without writing csv rows"))
 	}
 
 	job.Status = web.StatusOK
 	return w.svc.Update(ctx, job)
+}
+
+func (w *worker) failJob(ctx context.Context, job *web.Job, err error) error {
+	job.Status = web.StatusFailed
+	if updateErr := w.svc.Update(ctx, job); updateErr != nil {
+		return fmt.Errorf("%w; failed to update job status: %v", err, updateErr)
+	}
+
+	return err
 }
 
 func (w *worker) setupMate(writer io.Writer, job *web.Job) (*scrapemateapp.ScrapemateApp, error) {

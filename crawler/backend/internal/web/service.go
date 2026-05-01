@@ -58,15 +58,31 @@ func (s *Service) SelectPending(ctx context.Context) ([]Job, error) {
 	return s.repo.Select(ctx, SelectParams{Status: StatusPending, Limit: 1})
 }
 
-func (s *Service) GetCSV(_ context.Context, id string) (string, error) {
+func (s *Service) GetCSV(ctx context.Context, id string) (string, error) {
 	if strings.Contains(id, "/") || strings.Contains(id, "\\") || strings.Contains(id, "..") {
 		return "", fmt.Errorf("invalid file name")
 	}
 
+	job, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return "", ErrNotFound
+	}
+
+	if job.Status != StatusOK {
+		return "", ErrCSVNotReady
+	}
+
 	datapath := filepath.Join(s.dataFolder, id+".csv")
 
-	if _, err := os.Stat(datapath); os.IsNotExist(err) {
+	info, err := os.Stat(datapath)
+	if os.IsNotExist(err) {
 		return "", fmt.Errorf("csv file not found for job %s", id)
+	} else if err != nil {
+		return "", err
+	}
+
+	if info.Size() == 0 {
+		return "", ErrCSVEmpty
 	}
 
 	return datapath, nil

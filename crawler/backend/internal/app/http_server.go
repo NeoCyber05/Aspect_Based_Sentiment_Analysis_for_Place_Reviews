@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -177,7 +178,14 @@ func (s *httpServer) downloadCSV(w http.ResponseWriter, r *http.Request) {
 
 	filePath, err := s.svc.GetCSV(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		switch {
+		case errors.Is(err, web.ErrCSVNotReady):
+			writeError(w, http.StatusConflict, "job chua hoan tat, chua the tai csv")
+		case errors.Is(err, web.ErrCSVEmpty):
+			writeError(w, http.StatusConflict, "csv chua co du lieu")
+		default:
+			writeError(w, http.StatusNotFound, err.Error())
+		}
 		return
 	}
 

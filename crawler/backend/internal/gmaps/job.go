@@ -152,24 +152,30 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 
 		next = append(next, placeJob)
 	} else {
-		doc.Find(`div[role=feed] div[jsaction]>a`).Each(func(_ int, s *goquery.Selection) {
-			if href := s.AttrOr("href", ""); href != "" {
-				jopts := []PlaceJobOptions{}
-				if j.ExitMonitor != nil {
-					jopts = append(jopts, WithPlaceJobExitMonitor(j.ExitMonitor))
-				}
-
-				if j.WriterManagedCompletion {
-					jopts = append(jopts, WithPlaceJobWriterManagedCompletion())
-				}
-
-				nextJob := NewPlaceJob(j.ID, j.LangCode, href, j.ExtractEmail, j.ExtractExtraReviews, jopts...)
-
-				if j.Deduper == nil || j.Deduper.AddIfNotExists(ctx, href) {
-					next = append(next, nextJob)
-				}
+		for _, href := range extractPlaceHrefs(doc) {
+			jopts := []PlaceJobOptions{}
+			if j.ExitMonitor != nil {
+				jopts = append(jopts, WithPlaceJobExitMonitor(j.ExitMonitor))
 			}
-		})
+
+			if j.WriterManagedCompletion {
+				jopts = append(jopts, WithPlaceJobWriterManagedCompletion())
+			}
+
+			nextJob := NewPlaceJob(j.ID, j.LangCode, href, j.ExtractEmail, j.ExtractExtraReviews, jopts...)
+
+			if j.Deduper == nil || j.Deduper.AddIfNotExists(ctx, href) {
+				next = append(next, nextJob)
+			}
+		}
+	}
+
+	if len(next) == 0 {
+		if j.ExitMonitor != nil {
+			j.ExitMonitor.IncrSeedCompleted(1)
+		}
+
+		return nil, nil, fmt.Errorf("no places found in Google Maps search response")
 	}
 
 	if j.ExitMonitor != nil {
@@ -236,6 +242,21 @@ func (j *GmapJob) BrowserActions(ctx context.Context, page scrapemate.BrowserPag
 		return resp
 	}
 
+	if err != nil {
+		resp.URL = page.URL()
+
+		var body string
+		body, err = page.Content()
+		if err != nil {
+			resp.Error = err
+			return resp
+		}
+
+		resp.Body = []byte(body)
+
+		return resp
+	}
+
 	scrollSelector := `div[role='feed']`
 
 	_, err = scroll(ctx, page, j.MaxDepth, scrollSelector)
@@ -270,6 +291,35 @@ func waitUntilURLContains(ctx context.Context, page scrapemate.BrowserPage, s st
 			}
 		}
 	}
+}
+
+func extractPlaceHrefs(doc *goquery.Document) []string {
+	seen := map[string]struct{}{}
+	var hrefs []string
+
+	doc.Find(`div[role=feed] div[jsaction]>a, a[href*="/maps/place/"]`).Each(func(_ int, s *goquery.Selection) {
+		href := strings.TrimSpace(s.AttrOr("href", ""))
+		if href == "" {
+			return
+		}
+
+		if strings.HasPrefix(href, "/maps/place/") {
+			href = "https://www.google.com" + href
+		}
+
+		if !strings.Contains(href, "/maps/place/") {
+			return
+		}
+
+		if _, ok := seen[href]; ok {
+			return
+		}
+
+		seen[href] = struct{}{}
+		hrefs = append(hrefs, href)
+	})
+
+	return hrefs
 }
 
 func clickRejectCookiesIfRequired(page scrapemate.BrowserPage) {

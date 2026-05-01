@@ -239,11 +239,19 @@ func (e *Entry) AddExtraReviews(pages [][]byte) {
 		return
 	}
 
+	hasInlineReviews := len(e.UserReviews) > 0
 	for _, page := range pages {
 		reviews := extractReviews(page)
 		if len(reviews) > 0 {
 			e.UserReviewsExtended = append(e.UserReviewsExtended, reviews...)
+			if !hasInlineReviews {
+				e.UserReviews = append(e.UserReviews, reviews...)
+			}
 		}
+	}
+
+	if e.ReviewCount == 0 && len(e.UserReviewsExtended) > 0 {
+		e.ReviewCount = len(e.UserReviewsExtended)
 	}
 }
 

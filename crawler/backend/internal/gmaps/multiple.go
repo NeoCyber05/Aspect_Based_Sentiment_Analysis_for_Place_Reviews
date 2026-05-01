@@ -3,6 +3,7 @@ package gmaps
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	olc "github.com/google/open-location-code/go"
@@ -43,6 +44,9 @@ func ParseSearchResults(raw []byte) ([]*Entry, error) {
 		entry.ID = getNthElementAndCast[string](business, 0)
 		entry.Title = getNthElementAndCast[string](business, 11)
 		entry.Categories = toStringSlice(getNthElementAndCast[[]any](business, 13))
+		if len(entry.Categories) > 0 {
+			entry.Category = entry.Categories[0]
+		}
 		entry.WebSite = getNthElementAndCast[string](business, 7, 0)
 
 		entry.ReviewRating = getNthElementAndCast[float64](business, 4, 7)
@@ -71,6 +75,8 @@ func ParseSearchResults(raw []byte) ([]*Entry, error) {
 		entry.Status = getNthElementAndCast[string](business, 34, 4, 4)
 		entry.Timezone = getNthElementAndCast[string](business, 30)
 		entry.DataID = getNthElementAndCast[string](business, 10)
+		entry.PlaceID = getNthElementAndCast[string](business, 78)
+		entry.Link = mapsPlaceURL(entry.Title, entry.Latitude, entry.Longtitude, entry.DataID, entry.PlaceID)
 
 		entry.PlusCode = olc.Encode(entry.Latitude, entry.Longtitude, 10)
 
@@ -87,4 +93,27 @@ func toStringSlice(arr []any) []string {
 	}
 
 	return ans
+}
+
+func mapsPlaceURL(title string, lat, lon float64, dataID, placeID string) string {
+	title = strings.TrimSpace(title)
+	dataID = strings.TrimSpace(dataID)
+	if title != "" && lat != 0 && lon != 0 && dataID != "" {
+		return fmt.Sprintf(
+			"https://www.google.com/maps/place/%s/@%.7f,%.7f,17z/data=!3m1!4b1!4m5!3m4!1s%s!8m2!3d%.7f!4d%.7f",
+			url.QueryEscape(title),
+			lat,
+			lon,
+			dataID,
+			lat,
+			lon,
+		)
+	}
+
+	placeID = strings.TrimSpace(placeID)
+	if placeID == "" {
+		return ""
+	}
+
+	return "https://www.google.com/maps/place/?q=place_id:" + url.QueryEscape(placeID)
 }

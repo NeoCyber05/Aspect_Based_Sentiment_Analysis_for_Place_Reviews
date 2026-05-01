@@ -113,6 +113,15 @@ func TestDownloadCSV(t *testing.T) {
 		t.Fatalf("failed to write csv fixture: %v", err)
 	}
 
+	job, err := server.svc.Get(context.Background(), createOut.ID)
+	if err != nil {
+		t.Fatalf("failed to load created job: %v", err)
+	}
+	job.Status = web.StatusOK
+	if err := server.svc.Update(context.Background(), &job); err != nil {
+		t.Fatalf("failed to update job status: %v", err)
+	}
+
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+createOut.ID+"/download", nil)
 	req.SetPathValue("id", createOut.ID)
 	resp := httptest.NewRecorder()
@@ -124,5 +133,54 @@ func TestDownloadCSV(t *testing.T) {
 
 	if resp.Header().Get("Content-Type") != "text/csv" {
 		t.Fatalf("expected text/csv content type, got %q", resp.Header().Get("Content-Type"))
+	}
+}
+
+func TestDownloadCSVRejectsEmptyFile(t *testing.T) {
+	t.Parallel()
+
+	server, dataDir := newTestHTTPServer(t)
+
+	payload := createJobRequest{
+		Name:           "job empty csv",
+		Keywords:       []string{"coffee hanoi"},
+		Lang:           "vi",
+		Zoom:           15,
+		Depth:          10,
+		Radius:         1000,
+		MaxTimeSeconds: 300,
+	}
+	body, _ := json.Marshal(payload)
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewReader(body))
+	createResp := httptest.NewRecorder()
+	server.jobs(createResp, createReq)
+
+	var createOut createJobResponse
+	if err := json.Unmarshal(createResp.Body.Bytes(), &createOut); err != nil {
+		t.Fatalf("failed to decode create response: %v", err)
+	}
+
+	csvPath := filepath.Join(dataDir, createOut.ID+".csv")
+	if err := os.WriteFile(csvPath, nil, 0o600); err != nil {
+		t.Fatalf("failed to write csv fixture: %v", err)
+	}
+
+	job, err := server.svc.Get(context.Background(), createOut.ID)
+	if err != nil {
+		t.Fatalf("failed to load created job: %v", err)
+	}
+	job.Status = web.StatusOK
+	if err := server.svc.Update(context.Background(), &job); err != nil {
+		t.Fatalf("failed to update job status: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+createOut.ID+"/download", nil)
+	req.SetPathValue("id", createOut.ID)
+	resp := httptest.NewRecorder()
+	server.downloadCSV(resp, req)
+
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", resp.Code)
 	}
 }
