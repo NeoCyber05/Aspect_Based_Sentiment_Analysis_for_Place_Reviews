@@ -12,9 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/writers/csvwriter"
-	"github.com/gosom/scrapemate/scrapemateapp"
 
 	"crawler/backend/internal/deduper"
 	"crawler/backend/internal/exiter"
@@ -167,33 +165,17 @@ func (w *worker) failJob(ctx context.Context, job *web.Job, err error) error {
 	return err
 }
 
-func (w *worker) setupMate(writer io.Writer, job *web.Job) (*scrapemateapp.ScrapemateApp, error) {
-	opts := []func(*scrapemateapp.Config) error{
-		scrapemateapp.WithConcurrency(w.cfg.Concurrency),
-		scrapemateapp.WithExitOnInactivity(3 * time.Minute),
-	}
-
-	if !job.Data.FastMode {
-		opts = append(opts, scrapemateapp.WithJS(scrapemateapp.DisableImages()))
-	} else {
-		opts = append(opts, scrapemateapp.WithStealth("firefox"))
-	}
-
-	if len(w.cfg.Proxies) > 0 {
-		opts = append(opts, scrapemateapp.WithProxies(w.cfg.Proxies))
-	} else if len(job.Data.Proxies) > 0 {
-		opts = append(opts, scrapemateapp.WithProxies(job.Data.Proxies))
-	}
-
-	if !w.cfg.DisablePageReuse {
-		opts = append(opts, scrapemateapp.WithPageReuseLimit(200))
-	}
-
+func (w *worker) setupMate(writer io.Writer, job *web.Job) (crawlMate, error) {
 	csvWriter := csvwriter.NewCsvWriter(csv.NewWriter(writer))
-	mateCfg, err := scrapemateapp.NewConfig([]scrapemate.ResultWriter{csvWriter}, opts...)
+	httpFetcher, err := w.setupFetcher(job)
 	if err != nil {
 		return nil, fmt.Errorf("không tạo được cấu hình crawler: %w", err)
 	}
 
-	return scrapemateapp.NewScrapeMateApp(mateCfg)
+	return &localMate{
+		concurrency:      w.cfg.Concurrency,
+		exitOnInactivity: 3 * time.Minute,
+		fetcher:          httpFetcher,
+		writer:           csvWriter,
+	}, nil
 }

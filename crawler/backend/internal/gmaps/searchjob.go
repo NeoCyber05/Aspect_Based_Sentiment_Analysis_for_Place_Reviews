@@ -143,11 +143,29 @@ func (j *SearchJob) Process(_ context.Context, resp *scrapemate.Response) (any, 
 		return nil, nil, fmt.Errorf("failed to parse search results: %w", err)
 	}
 
+	unfilteredCount := len(entries)
 	entries = filterAndSortEntriesWithinRadius(entries,
 		j.params.Location.Lat,
 		j.params.Location.Lon,
 		j.params.Location.Radius,
 	)
+	if len(entries) == 0 {
+		if j.ExitMonitor != nil {
+			j.ExitMonitor.IncrSeedCompleted(1)
+		}
+
+		if unfilteredCount == 0 {
+			return nil, nil, fmt.Errorf("no search results found")
+		}
+
+		return nil, nil, fmt.Errorf(
+			"all %d search results are outside %.0fm radius from %.6f,%.6f",
+			unfilteredCount,
+			j.params.Location.Radius,
+			j.params.Location.Lat,
+			j.params.Location.Lon,
+		)
+	}
 
 	if j.ExitMonitor != nil {
 		j.ExitMonitor.IncrPlacesFound(len(entries))

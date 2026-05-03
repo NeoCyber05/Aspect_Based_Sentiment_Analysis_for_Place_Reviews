@@ -98,7 +98,7 @@ func CreateSeedJobs(
 			}
 
 			job = gmaps.NewPlaceJob(q.id, langCode, placeURL, email, extraReviews, opts...)
-		} else if !fastmode && !hasGeoCoordinates {
+		} else if !fastmode {
 			opts := []gmaps.GmapJobOptions{}
 			if dedup != nil {
 				opts = append(opts, gmaps.WithDeduper(dedup))
