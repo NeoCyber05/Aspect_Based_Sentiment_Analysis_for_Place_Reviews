@@ -29,6 +29,7 @@ type GmapJob struct {
 	ExitMonitor             exiter.Exiter
 	ExtractExtraReviews     bool
 	WriterManagedCompletion bool
+	CrawlMode               string
 }
 
 func NewGmapJob(
@@ -103,6 +104,12 @@ func WithWriterManagedCompletion() GmapJobOptions {
 	}
 }
 
+func WithCrawlMode(mode string) GmapJobOptions {
+	return func(j *GmapJob) {
+		j.CrawlMode = mode
+	}
+}
+
 func (j *GmapJob) UseInResults() bool {
 	return false
 }
@@ -147,6 +154,9 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 		if j.WriterManagedCompletion {
 			jopts = append(jopts, WithPlaceJobWriterManagedCompletion())
 		}
+		if j.CrawlMode != "" {
+			jopts = append(jopts, WithPlaceJobCrawlMode(j.CrawlMode))
+		}
 
 		placeJob := NewPlaceJob(j.ID, j.LangCode, resp.URL, j.ExtractEmail, j.ExtractExtraReviews, jopts...)
 
@@ -160,6 +170,9 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 
 			if j.WriterManagedCompletion {
 				jopts = append(jopts, WithPlaceJobWriterManagedCompletion())
+			}
+			if j.CrawlMode != "" {
+				jopts = append(jopts, WithPlaceJobCrawlMode(j.CrawlMode))
 			}
 
 			nextJob := NewPlaceJob(j.ID, j.LangCode, href, j.ExtractEmail, j.ExtractExtraReviews, jopts...)

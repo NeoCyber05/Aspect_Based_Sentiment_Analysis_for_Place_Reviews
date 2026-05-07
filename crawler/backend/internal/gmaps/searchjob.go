@@ -36,6 +36,7 @@ type SearchJob struct {
 	params                  *MapSearchParams
 	ExitMonitor             exiter.Exiter
 	WriterManagedCompletion bool
+	CrawlMode               string
 }
 
 func NewSearchJob(params *MapSearchParams, opts ...SearchJobOptions) *SearchJob {
@@ -74,6 +75,12 @@ func WithSearchJobExitMonitor(exitMonitor exiter.Exiter) SearchJobOptions {
 func WithSearchJobWriterManagedCompletion() SearchJobOptions {
 	return func(j *SearchJob) {
 		j.WriterManagedCompletion = true
+	}
+}
+
+func WithSearchJobCrawlMode(mode string) SearchJobOptions {
+	return func(j *SearchJob) {
+		j.CrawlMode = mode
 	}
 }
 
@@ -141,6 +148,10 @@ func (j *SearchJob) Process(_ context.Context, resp *scrapemate.Response) (any, 
 		}
 
 		return nil, nil, fmt.Errorf("failed to parse search results: %w", err)
+	}
+
+	for _, entry := range entries {
+		entry.CrawlMode = j.CrawlMode
 	}
 
 	unfilteredCount := len(entries)

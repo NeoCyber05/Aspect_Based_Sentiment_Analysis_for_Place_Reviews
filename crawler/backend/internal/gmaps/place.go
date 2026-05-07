@@ -22,6 +22,7 @@ type PlaceJob struct {
 	ExitMonitor             exiter.Exiter
 	ExtractExtraReviews     bool
 	WriterManagedCompletion bool
+	CrawlMode               string
 }
 
 func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews bool, opts ...PlaceJobOptions) *PlaceJob {
@@ -65,6 +66,12 @@ func WithPlaceJobWriterManagedCompletion() PlaceJobOptions {
 	}
 }
 
+func WithPlaceJobCrawlMode(mode string) PlaceJobOptions {
+	return func(j *PlaceJob) {
+		j.CrawlMode = mode
+	}
+}
+
 func (j *PlaceJob) ProcessOnFetchError() bool {
 	return true
 }
@@ -103,6 +110,7 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 	}
 
 	entry.ID = j.ParentID
+	entry.CrawlMode = j.CrawlMode
 
 	if entry.Link == "" {
 		entry.Link = j.GetURL()

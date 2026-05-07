@@ -58,6 +58,7 @@ type Review struct {
 }
 
 type Entry struct {
+	CrawlMode  string              `json:"-"`
 	ID         string              `json:"input_id"`
 	Link       string              `json:"link"`
 	Cid        string              `json:"cid"`
@@ -157,6 +158,13 @@ func (e *Entry) Validate() error {
 }
 
 func (e *Entry) CsvHeaders() []string {
+	if e.CrawlMode == "train" {
+		return []string{
+			"title",
+			"category",
+		}
+	}
+
 	return []string{
 		"input_id",
 		"link",
@@ -196,6 +204,13 @@ func (e *Entry) CsvHeaders() []string {
 }
 
 func (e *Entry) CsvRow() []string {
+	if e.CrawlMode == "train" {
+		return []string{
+			e.Title,
+			e.Category,
+		}
+	}
+
 	return []string{
 		e.ID,
 		e.Link,

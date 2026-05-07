@@ -21,6 +21,7 @@ func TestCreateSeedJobsUsesBrowserJobWhenNotFastWithCoordinates(t *testing.T) {
 		nil,
 		nil,
 		false,
+		"",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -47,6 +48,7 @@ func TestCreateSeedJobsUsesSearchJobWhenFast(t *testing.T) {
 		nil,
 		nil,
 		false,
+		"",
 	)
 	if err != nil {
 		t.Fatal(err)

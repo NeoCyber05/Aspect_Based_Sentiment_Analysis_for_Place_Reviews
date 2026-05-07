@@ -25,6 +25,7 @@ type createJobRequest struct {
 	ExtraReviews   bool     `json:"extra_reviews"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
 	Proxies        []string `json:"proxies"`
+	CrawlMode      string   `json:"crawl_mode"`
 }
 
 type createJobResponse struct {
@@ -54,6 +55,7 @@ type jobResponse struct {
 	ExtraReviews   bool     `json:"extra_reviews"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
 	Proxies        []string `json:"proxies"`
+	CrawlMode      string   `json:"crawl_mode"`
 }
 
 func (r *createJobRequest) normalize() {
@@ -61,6 +63,7 @@ func (r *createJobRequest) normalize() {
 	r.Lang = strings.TrimSpace(r.Lang)
 	r.Lat = strings.TrimSpace(r.Lat)
 	r.Lon = strings.TrimSpace(r.Lon)
+	r.CrawlMode = strings.TrimSpace(r.CrawlMode)
 
 	keywords := make([]string, 0, len(r.Keywords))
 	for _, keyword := range r.Keywords {
@@ -108,6 +111,10 @@ func (r *createJobRequest) validate() error {
 		r.Lang = "vi"
 	}
 
+	if r.CrawlMode == "" {
+		r.CrawlMode = "full"
+	}
+
 	return nil
 }
 
@@ -131,6 +138,7 @@ func (r *createJobRequest) toWebJob() web.Job {
 			ExtraReviews: r.ExtraReviews,
 			MaxTime:      time.Duration(r.MaxTimeSeconds) * time.Second,
 			Proxies:      r.Proxies,
+			CrawlMode:    r.CrawlMode,
 		},
 	}
 }
@@ -154,5 +162,6 @@ func toJobResponse(job web.Job) jobResponse {
 		ExtraReviews:   job.Data.ExtraReviews,
 		MaxTimeSeconds: int(job.Data.MaxTime.Seconds()),
 		Proxies:        job.Data.Proxies,
+		CrawlMode:      job.Data.CrawlMode,
 	}
 }

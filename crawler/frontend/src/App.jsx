@@ -74,7 +74,8 @@ const initialForm = {
   email: false,
   extraReviews: true,
   lat: "",
-  lon: ""
+  lon: "",
+  crawlMode: "full"
 };
 
 const defaultMapCenter = {
@@ -521,6 +522,7 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("full");
 
   const keywords = useMemo(
     () =>
@@ -537,6 +539,11 @@ export default function App() {
     if (lat === null || lng === null) return null;
     return { lat, lng };
   }, [form.lat, form.lon]);
+
+  const filteredJobs = useMemo(
+    () => jobs.filter((job) => (job.crawl_mode || "full") === activeTab),
+    [activeTab, jobs]
+  );
 
   async function loadJobs() {
     setLoadingJobs(true);
@@ -605,7 +612,8 @@ export default function App() {
         depth: Number(form.depth),
         email: form.email,
         extra_reviews: form.extraReviews,
-        max_time_seconds: Number(form.maxTimeSeconds)
+        max_time_seconds: Number(form.maxTimeSeconds),
+        crawl_mode: form.crawlMode
       };
 
       if (!batchMode) {
@@ -741,6 +749,13 @@ export default function App() {
               />
             </label>
             <label className="field">
+              <span>Crawl Mode</span>
+              <select value={form.crawlMode} onChange={(e) => updateField("crawlMode", e.target.value)}>
+                <option value="full">Full (Tất cả)</option>
+                <option value="train">Train (Chỉ Title & Category)</option>
+              </select>
+            </label>
+            <label className="field">
               <span>Latitude</span>
               <input value={form.lat} onChange={(e) => updateField("lat", e.target.value)} />
             </label>
@@ -804,12 +819,31 @@ export default function App() {
       </main>
 
       <section className="panel jobs-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Theo dõi</p>
-            <h2>Danh sách job</h2>
+        <div className="panel-heading jobs-heading">
+          <div className="jobs-heading-row">
+            <div>
+              <p className="eyebrow">Theo dõi</p>
+              <h2>Danh sách job</h2>
+            </div>
+            <span className="job-count">{filteredJobs.length} job</span>
           </div>
-          <span className="job-count">{jobs.length} job</span>
+
+          <div className="tabs" role="tablist" aria-label="Chế độ crawl">
+            <button
+              type="button"
+              className={`tab-button ${activeTab === "full" ? "active" : ""}`}
+              onClick={() => setActiveTab("full")}
+            >
+              Danh sách tải full
+            </button>
+            <button
+              type="button"
+              className={`tab-button ${activeTab === "train" ? "active" : ""}`}
+              onClick={() => setActiveTab("train")}
+            >
+              Danh sách tải train
+            </button>
+          </div>
         </div>
 
         <div className="table-wrap">
@@ -824,14 +858,14 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {jobs.length === 0 ? (
+              {filteredJobs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="empty-cell">
-                    Chưa có job nào.
+                    Chưa có job nào trong danh sách này.
                   </td>
                 </tr>
               ) : (
-                jobs.map((job) => (
+                filteredJobs.map((job) => (
                   <tr key={job.id}>
                     <td className="job-name">{job.name}</td>
                     <td>

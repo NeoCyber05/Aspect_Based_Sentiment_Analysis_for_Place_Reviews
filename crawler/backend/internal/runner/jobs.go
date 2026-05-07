@@ -29,6 +29,7 @@ func CreateSeedJobs(
 	dedup deduper.Deduper,
 	exitMonitor exiter.Exiter,
 	extraReviews bool,
+	crawlMode string,
 ) (jobs []scrapemate.IJob, err error) {
 	var lat, lon float64
 
@@ -97,6 +98,10 @@ func CreateSeedJobs(
 				opts = append(opts, gmaps.WithPlaceJobExitMonitor(exitMonitor))
 			}
 
+			if crawlMode != "" {
+				opts = append(opts, gmaps.WithPlaceJobCrawlMode(crawlMode))
+			}
+
 			job = gmaps.NewPlaceJob(q.id, langCode, placeURL, email, extraReviews, opts...)
 		} else if !fastmode {
 			opts := []gmaps.GmapJobOptions{}
@@ -110,6 +115,10 @@ func CreateSeedJobs(
 
 			if extraReviews {
 				opts = append(opts, gmaps.WithExtraReviews())
+			}
+
+			if crawlMode != "" {
+				opts = append(opts, gmaps.WithCrawlMode(crawlMode))
 			}
 
 			job = gmaps.NewGmapJob(q.id, langCode, q.text, maxDepth, email, geoCoordinates, zoom, opts...)
@@ -130,6 +139,10 @@ func CreateSeedJobs(
 			opts := []gmaps.SearchJobOptions{}
 			if exitMonitor != nil {
 				opts = append(opts, gmaps.WithSearchJobExitMonitor(exitMonitor))
+			}
+
+			if crawlMode != "" {
+				opts = append(opts, gmaps.WithSearchJobCrawlMode(crawlMode))
 			}
 
 			job = gmaps.NewSearchJob(&params, opts...)

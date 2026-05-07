@@ -18,6 +18,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -165,6 +166,7 @@ button {
 }
 
 .field input,
+.field select,
 .field textarea,
 .map-search input {
   width: 100%;
@@ -181,6 +183,7 @@ button {
 }
 
 .field input,
+.field select,
 .map-search input {
   min-height: 42px;
   padding: 9px 11px;
@@ -193,6 +196,7 @@ button {
 }
 
 .field input:focus,
+.field select:focus,
 .field textarea:focus,
 .map-search input:focus {
   border-color: #2563eb;
@@ -203,6 +207,10 @@ button {
 .field textarea::placeholder,
 .map-search input::placeholder {
   color: #94a3b8;
+}
+
+.field select {
+  cursor: pointer;
 }
 
 .full {
@@ -424,6 +432,40 @@ button {
   font-size: 0.9rem;
 }
 
+.jobs-heading {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.jobs-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.tab-button {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.tab-button.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -534,6 +576,19 @@ td {
   .panel-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .jobs-heading-row,
+  .tabs {
+    width: 100%;
+  }
+
+  .jobs-heading-row {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    flex: 1;
   }
 
   .ghost-button {

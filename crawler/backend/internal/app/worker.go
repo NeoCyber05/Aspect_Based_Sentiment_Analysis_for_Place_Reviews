@@ -110,6 +110,7 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 		dedup,
 		exitMonitor,
 		w.cfg.ExtraReviews || job.Data.ExtraReviews,
+		job.Data.CrawlMode,
 	)
 	if err != nil {
 		return w.failJob(ctx, job, err)
