@@ -1,0 +1,277 @@
+bthg - bình thường
+bv - bảo vệ
+bve - bảo vệ
+cafe - cà phê
+cf - cà phê
+checkin - nhận phòng
+checkout - trả phòng
+dv - dịch vụ
+gđ - gia đình
+hn - Hà Nội
+k/s - khách sạn
+kgian - không gian
+khg - không
+ko - không
+ks - khách sạn
+ksan - khách sạn
+lt - lễ tân
+mik - mình
+mn - mọi người
+mng - mọi người
+nhg - nhưng
+nn - nhà nghỉ
+ntn - như thế nào
+nv - nhân viên
+nvien - nhân viên
+nvs - nhà vệ sinh
+ql - quản lý
+qly - quản lý
+qá - quá
+sg - Sài Gòn
+thik - thích
+thks - cảm ơn
+tks - cảm ơn
+vsinh - vệ sinh
+wc - nhà vệ sinh
+đc - được
+đh - điều hòa
+khachsan - khách sạn
+hotel - khách sạn
+resort - khu nghỉ dưỡng
+homestay - nhà nghỉ
+motel - nhà nghỉ
+nhanghi - nhà nghỉ
+phong - phòng
+phg - phòng
+fong - phòng
+ptoilet - phòng toilet
+toilet - nhà vệ sinh
+vesinh - vệ sinh
+sse - sạch sẽ
+sachse - sạch sẽ
+sach - sạch
+giuong - giường
+drap - ga giường
+chan - chăn
+nem - nệm
+noithat - nội thất
+tb - thiết bị
+thietbi - thiết bị
+tiệnnghi - tiện nghi
+tnghi - tiện nghi
+tnghiem - trải nghiệm
+trnghiem - trải nghiệm
+khong - không
+hok - không
+hong - không
+hông - không
+chả - không
+chang - chẳng
+k0 - không
+ko co - không có
+kg co - không có
+khong co - không có
+cũg - cũng
+rat - rất
+rât - rất
+qua - quá
+wa - quá
+wá - quá
+okay - ổn
+okie - ổn
+okela - ổn
+ngon - tốt
+nice - tốt
+good - tốt
+perfect - tuyệt vời
+great - tuyệt vời
+excellent - tuyệt vời
+bad - tệ
+terrible - tệ
+poor - tệ
+best - tốt nhất
+duoc - được
+ko dc - không được
+kg dc - không được
+ko đc - không được
+kg đc - không được
+chua tot - chưa tốt
+chua cao - chưa cao
+thap - thấp
+re - rẻ
+gia - giá
+gca - giá cả
+giaca - giá cả
+gía - giá
+gía cả - giá cả
+phi - phí
+phithue - phí thuê
+thue - thuê
+giamgia - giảm giá
+kmãi - khuyến mãi
+khuyenmai - khuyến mãi
+voucher - phiếu giảm giá
+sale - giảm giá
+hailong - hài lòng
+ưng - hài lòng
+thich - thích
+ko thich - không thích
+kg thich - không thích
+thatvong - thất vọng
+that vong - thất vọng
+buc - bực
+buc minh - bực mình
+kho chiu - khó chịu
+de chiu - dễ chịu
+thoai mai - thoải mái
+thoaimai - thoải mái
+vui ve - vui vẻ
+than thien - thân thiện
+thanthien - thân thiện
+nhiettinh - nhiệt tình
+tantinh - tận tình
+lich su - lịch sự
+lichsu - lịch sự
+lsu - lịch sự
+letan - lễ tân
+nhanvien - nhân viên
+phucvu - phục vụ
+dichvu - dịch vụ
+quanly - quản lý
+baove - bảo vệ
+khach - khách
+khachhang - khách hàng
+khach du lich - khách du lịch
+khachdl - khách du lịch
+dulich - du lịch
+nghiduong - nghỉ dưỡng
+nghi duong - nghỉ dưỡng
+check in - nhận phòng
+ci - nhận phòng
+nhan phong - nhận phòng
+check out - trả phòng
+tra phong - trả phòng
+booking - đặt phòng
+datphong - đặt phòng
+confirm - xác nhận
+xacnhan - xác nhận
+cancel - hủy
+huy phong - hủy phòng
+view dep - cảnh quan đẹp
+view đẹp - cảnh quan đẹp
+view ho - cảnh quan hồ
+view hồ - cảnh quan hồ
+xau - xấu
+thoang - thoáng
+rong - rộng
+rong rai - rộng rãi
+nho - nhỏ
+hep - hẹp
+lang man - lãng mạn
+langman - lãng mạn
+yen tinh - yên tĩnh
+yentinh - yên tĩnh
+on ao - ồn ào
+vtri - vị trí
+vitri - vị trí
+ddiem - địa điểm
+diadiem - địa điểm
+diachi - địa chỉ
+trungtam - trung tâm
+ttien - thuận tiện
+dilai - đi lại
+dichuyen - di chuyển
+di chuyen - di chuyển
+mat duong - mặt đường
+duong - đường
+pho - phố
+san bay - sân bay
+sanbay - sân bay
+sb - sân bay
+ben xe - bến xe
+benxe - bến xe
+oto - ô tô
+o to - ô tô
+xe may - xe máy
+xemay - xe máy
+baixe - bãi xe
+parking - bãi đỗ xe
+baidoxe - bãi đỗ xe
+nhahang - nhà hàng
+nha hang - nhà hàng
+quan an - quán ăn
+quanan - quán ăn
+bar - quán bar
+quan bar - quán bar
+coffee - cà phê
+caphe - cà phê
+an sang - ăn sáng
+ansang - ăn sáng
+breakfast - bữa sáng
+bua sang - bữa sáng
+do an - đồ ăn
+doan - đồ ăn
+mon an - món ăn
+monan - món ăn
+ngon mieng - ngon miệng
+da dang - đa dạng
+phong phu - phong phú
+phongphu - phong phú
+lua chon - lựa chọn
+luachon - lựa chọn
+wi-fi - wifi
+wf - wifi
+may lanh - máy lạnh
+maylanh - máy lạnh
+dieu hoa - điều hòa
+nong lanh - nóng lạnh
+nonglanh - nóng lạnh
+nuoc nong - nước nóng
+nuocnong - nước nóng
+bon tam - bồn tắm
+bontam - bồn tắm
+thang may - thang máy
+thangmay - thang máy
+ban cong - ban công
+bancong - ban công
+ho boi - hồ bơi
+hoboi - hồ bơi
+pool - hồ bơi
+gym - phòng gym
+giat ui - giặt ủi
+giat do - giặt đồ
+anninh - an ninh
+an toan - an toàn
+antoan - an toàn
+minibar - tủ lạnh mini
+tu lanh - tủ lạnh
+tulanh - tủ lạnh
+nuoc - nước
+khan - khăn
+khan tam - khăn tắm
+kem danh rang - kem đánh răng
+ban chai - bàn chải
+dep di trong phong - dép đi trong phòng
+cua so - cửa sổ
+cuaso - cửa sổ
+song - sông
+bien - biển
+nui - núi
+pho co - phố cổ
+phoco - phố cổ
+ho tay - hồ tây
+hnoi - Hà Nội
+ha noi - Hà Nội
+saigon - Sài Gòn
+tphcm - Thành phố Hồ Chí Minh
+hcmc - Thành phố Hồ Chí Minh
+da nang - Đà Nẵng
+da lat - Đà Lạt
+dalat - Đà Lạt
+phu quoc - Phú Quốc
+pq - Phú Quốc
+vung tau - Vũng Tàu
+vtau - Vũng Tàu
+hue - Huế
+can tho - Cần Thơ
+sapa - Sa Pa
