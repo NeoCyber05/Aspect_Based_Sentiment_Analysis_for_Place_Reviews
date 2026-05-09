@@ -15,6 +15,10 @@ type Config struct {
 	DisablePageReuse bool
 	Proxies          []string
 	PollInterval     time.Duration
+	PythonBin        string
+	ABSACheckpoint   string
+	ABSAModel        string
+	ABSATeencodePath string
 }
 
 func ParseConfig() (*Config, error) {
@@ -29,6 +33,10 @@ func ParseConfig() (*Config, error) {
 	flag.BoolVar(&cfg.DisablePageReuse, "disable-page-reuse", false, "tắt cơ chế page reuse của playwright")
 	flag.StringVar(&proxyCSV, "proxies", "", "danh sách proxy cách nhau bằng dấu phẩy")
 	flag.DurationVar(&cfg.PollInterval, "poll-interval", time.Second, "chu kỳ quét job pending")
+	flag.StringVar(&cfg.PythonBin, "python-bin", "python", "binary Python để chạy ABSA pipeline")
+	flag.StringVar(&cfg.ABSACheckpoint, "absa-checkpoint", "", "đường dẫn checkpoint ABSA .pt")
+	flag.StringVar(&cfg.ABSAModel, "absa-model", "intfloat/multilingual-e5-small", "pretrained model name dùng khi load checkpoint ABSA")
+	flag.StringVar(&cfg.ABSATeencodePath, "absa-teencode-path", "../../training/teencode/hotel_teencode.txt", "đường dẫn file teencode cho ABSA")
 	flag.Parse()
 
 	if cfg.Concurrency < 1 {

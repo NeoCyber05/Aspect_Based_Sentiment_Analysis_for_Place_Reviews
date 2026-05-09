@@ -22,6 +22,7 @@ type GmapJob struct {
 	scrapemate.Job
 
 	MaxDepth     int
+	MaxPlaces    int
 	LangCode     string
 	ExtractEmail bool
 
@@ -110,6 +111,12 @@ func WithCrawlMode(mode string) GmapJobOptions {
 	}
 }
 
+func WithMaxPlaces(maxPlaces int) GmapJobOptions {
+	return func(j *GmapJob) {
+		j.MaxPlaces = maxPlaces
+	}
+}
+
 func (j *GmapJob) UseInResults() bool {
 	return false
 }
@@ -189,6 +196,10 @@ func (j *GmapJob) Process(ctx context.Context, resp *scrapemate.Response) (any, 
 		}
 
 		return nil, nil, fmt.Errorf("no places found in Google Maps search response")
+	}
+
+	if j.MaxPlaces > 0 && len(next) > j.MaxPlaces {
+		next = next[:j.MaxPlaces]
 	}
 
 	if j.ExitMonitor != nil {

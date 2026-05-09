@@ -22,6 +22,7 @@ func CreateSeedJobs(
 	langCode string,
 	r io.Reader,
 	maxDepth int,
+	maxPlaces int,
 	email bool,
 	geoCoordinates string,
 	zoom int,
@@ -77,6 +78,10 @@ func CreateSeedJobs(
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
+		if maxPlaces > 0 && len(jobs) >= maxPlaces {
+			break
+		}
+
 		q, ok, parseErr := parseQueryLine(scanner.Text())
 		if parseErr != nil {
 			return nil, parseErr
@@ -120,6 +125,9 @@ func CreateSeedJobs(
 			if crawlMode != "" {
 				opts = append(opts, gmaps.WithCrawlMode(crawlMode))
 			}
+			if maxPlaces > 0 {
+				opts = append(opts, gmaps.WithMaxPlaces(maxPlaces))
+			}
 
 			job = gmaps.NewGmapJob(q.id, langCode, q.text, maxDepth, email, geoCoordinates, zoom, opts...)
 		} else {
@@ -143,6 +151,9 @@ func CreateSeedJobs(
 
 			if crawlMode != "" {
 				opts = append(opts, gmaps.WithSearchJobCrawlMode(crawlMode))
+			}
+			if maxPlaces > 0 {
+				opts = append(opts, gmaps.WithSearchJobMaxPlaces(maxPlaces))
 			}
 
 			job = gmaps.NewSearchJob(&params, opts...)

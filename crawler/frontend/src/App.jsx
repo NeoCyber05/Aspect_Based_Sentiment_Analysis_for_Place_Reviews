@@ -1,7 +1,7 @@
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createJob, deleteJob, downloadJobCsv, fetchJobs } from "./api";
+import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobs } from "./api";
 
 const vietMapApiKey = import.meta.env.VITE_VIETMAP_API_KEY?.trim() || "";
 const vietMapApiBase = "https://maps.vietmap.vn/api";
@@ -68,6 +68,7 @@ const initialForm = {
   depth: 10,
   zoom: 15,
   radius: 10000,
+  maxPlaces: 30,
   maxTimeSeconds: 600,
   fastMode: false,
   urlMode: false,
@@ -97,6 +98,15 @@ function formatDate(isoString) {
 
 function statusText(status) {
   return statusLabels[status] || status;
+}
+
+function prettifyAspectName(raw) {
+  return String(raw || "")
+    .replace(/&/g, " & ")
+    .replace(/#/g, " · ")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatCoordinate(value) {
@@ -523,6 +533,9 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("full");
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisJobID, setAnalysisJobID] = useState("");
+  const [analyzingJobID, setAnalyzingJobID] = useState("");
 
   const keywords = useMemo(
     () =>
@@ -610,6 +623,7 @@ export default function App() {
         fast_mode: form.fastMode,
         radius: Number(form.radius),
         depth: Number(form.depth),
+        max_places: Number(form.maxPlaces),
         email: form.email,
         extra_reviews: form.extraReviews,
         max_time_seconds: Number(form.maxTimeSeconds),
@@ -655,6 +669,22 @@ export default function App() {
       await loadJobs();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function onAnalyze(jobID) {
+    setError("");
+    setMessage("");
+    setAnalyzingJobID(jobID);
+    try {
+      const data = await analyzeJobCsv(jobID);
+      setAnalysisResult(data || null);
+      setAnalysisJobID(jobID);
+      setMessage("Đã phân tích ABSA từ file CSV của job.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalyzingJobID("");
     }
   }
 
@@ -737,6 +767,16 @@ export default function App() {
                 value={form.radius}
                 onChange={(e) => updateField("radius", e.target.value)}
                 min={1}
+              />
+            </label>
+            <label className="field">
+              <span>Giới hạn địa điểm cào</span>
+              <input
+                type="number"
+                value={form.maxPlaces}
+                onChange={(e) => updateField("maxPlaces", e.target.value)}
+                min={0}
+                placeholder="0 = không giới hạn"
               />
             </label>
             <label className="field">
@@ -854,13 +894,14 @@ export default function App() {
                 <th>Trạng thái</th>
                 <th>Thời gian tạo</th>
                 <th>Từ khóa</th>
+                <th>Giới hạn</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="empty-cell">
+                  <td colSpan={6} className="empty-cell">
                     Chưa có job nào trong danh sách này.
                   </td>
                 </tr>
@@ -873,10 +914,20 @@ export default function App() {
                     </td>
                     <td>{formatDate(job.created_at)}</td>
                     <td className="keywords-cell">{job.keywords?.join(", ") || "-"}</td>
+                    <td>{job.max_places > 0 ? job.max_places : "Không giới hạn"}</td>
                     <td>
                       <div className="actions">
                         <button type="button" onClick={() => downloadJobCsv(job.id)}>
                           Tải CSV
+                        </button>
+                        <button
+                          type="button"
+                          className="analysis"
+                          onClick={() => onAnalyze(job.id)}
+                          disabled={job.status !== "ok" || analyzingJobID === job.id}
+                          title={job.status !== "ok" ? "Chỉ phân tích khi job đã hoàn tất" : ""}
+                        >
+                          {analyzingJobID === job.id ? "Đang phân tích..." : "Phân tích"}
                         </button>
                         <button type="button" className="danger" onClick={() => onDelete(job.id)}>
                           Xóa
@@ -890,6 +941,48 @@ export default function App() {
           </table>
         </div>
       </section>
+
+      {analysisResult && (
+        <section className="panel analysis-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">ABSA tổng hợp</p>
+              <h2>Kết quả phân tích từ file CSV</h2>
+            </div>
+            <span className="job-count">Job: {analysisJobID}</span>
+          </div>
+
+          <div className="analysis-meta">
+            <span>{analysisResult.place_count || 0} địa điểm</span>
+            <span>{analysisResult.description_count || 0} description hợp lệ</span>
+          </div>
+
+          <div className="aspect-list">
+            {(analysisResult.aspects || []).map((item) => {
+              const scorePercent = Number(item.score_percent || 0);
+              const negative = Number(item.negative_percent || 0);
+              return (
+                <article className="aspect-row" key={item.aspect}>
+                  <div className="aspect-label">
+                    <strong>{prettifyAspectName(item.aspect)}</strong>
+                    <small>{item.mentions || 0} lượt đề cập</small>
+                  </div>
+                  <div className="aspect-meter-wrap">
+                    <div className="aspect-meter">
+                      <div className="aspect-meter-track" />
+                      <div
+                        className={`aspect-meter-fill ${negative >= 45 ? "negative" : "positive"}`}
+                        style={{ width: `${Math.max(0, Math.min(100, scorePercent))}%` }}
+                      />
+                    </div>
+                    <span className="aspect-score">{Number(item.score_5 || 0).toFixed(1)}/5</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

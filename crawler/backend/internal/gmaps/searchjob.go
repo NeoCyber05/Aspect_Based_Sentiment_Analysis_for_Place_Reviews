@@ -34,6 +34,7 @@ type SearchJob struct {
 	scrapemate.Job
 
 	params                  *MapSearchParams
+	MaxPlaces               int
 	ExitMonitor             exiter.Exiter
 	WriterManagedCompletion bool
 	CrawlMode               string
@@ -81,6 +82,12 @@ func WithSearchJobWriterManagedCompletion() SearchJobOptions {
 func WithSearchJobCrawlMode(mode string) SearchJobOptions {
 	return func(j *SearchJob) {
 		j.CrawlMode = mode
+	}
+}
+
+func WithSearchJobMaxPlaces(maxPlaces int) SearchJobOptions {
+	return func(j *SearchJob) {
+		j.MaxPlaces = maxPlaces
 	}
 }
 
@@ -176,6 +183,10 @@ func (j *SearchJob) Process(_ context.Context, resp *scrapemate.Response) (any, 
 			j.params.Location.Lat,
 			j.params.Location.Lon,
 		)
+	}
+
+	if j.MaxPlaces > 0 && len(entries) > j.MaxPlaces {
+		entries = entries[:j.MaxPlaces]
 	}
 
 	if j.ExitMonitor != nil {

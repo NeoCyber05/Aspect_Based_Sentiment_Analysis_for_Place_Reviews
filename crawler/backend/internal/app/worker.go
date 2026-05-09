@@ -98,6 +98,7 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 		job.Data.Lang,
 		strings.NewReader(strings.Join(job.Data.Keywords, "\n")),
 		job.Data.Depth,
+		job.Data.MaxPlaces,
 		job.Data.Email,
 		coords,
 		job.Data.Zoom,

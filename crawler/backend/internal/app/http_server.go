@@ -17,14 +17,16 @@ import (
 )
 
 type httpServer struct {
-	svc *web.Service
-	srv *http.Server
+	svc      *web.Service
+	srv      *http.Server
+	analyzer *reviewAnalyzer
 }
 
 func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 	handler := http.NewServeMux()
 	ans := &httpServer{
-		svc: svc,
+		svc:      svc,
+		analyzer: newReviewAnalyzer(cfg),
 		srv: &http.Server{
 			Addr:              cfg.Addr,
 			Handler:           withCORS(handler),
@@ -39,6 +41,7 @@ func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 	handler.HandleFunc("/api/v1/jobs", ans.jobs)
 	handler.HandleFunc("/api/v1/jobs/{id}", ans.jobByID)
 	handler.HandleFunc("/api/v1/jobs/{id}/download", ans.downloadCSV)
+	handler.HandleFunc("/api/v1/jobs/{id}/analyze", ans.analyzeCSV)
 
 	return ans
 }
@@ -202,6 +205,40 @@ func (s *httpServer) downloadCSV(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	_, _ = io.Copy(w, file)
+}
+
+func (s *httpServer) analyzeCSV(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	id, ok := parseJobID(r)
+	if !ok {
+		writeError(w, http.StatusUnprocessableEntity, "id không hợp lệ")
+		return
+	}
+
+	filePath, err := s.svc.GetCSV(r.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, web.ErrCSVNotReady):
+			writeError(w, http.StatusConflict, "job chua hoan tat, chua the phan tich")
+		case errors.Is(err, web.ErrCSVEmpty):
+			writeError(w, http.StatusConflict, "csv chua co du lieu")
+		default:
+			writeError(w, http.StatusNotFound, err.Error())
+		}
+		return
+	}
+
+	payload, err := s.analyzer.analyzeCSV(r.Context(), filePath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, payload)
 }
 
 func parseJobID(r *http.Request) (string, bool) {

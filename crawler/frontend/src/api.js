@@ -37,3 +37,10 @@ export async function deleteJob(id) {
 export function downloadJobCsv(id) {
   window.open(`${apiBase}/api/v1/jobs/${id}/download`, "_blank", "noopener,noreferrer");
 }
+
+export async function analyzeJobCsv(id) {
+  const response = await fetch(`${apiBase}/api/v1/jobs/${id}/analyze`, {
+    method: "POST"
+  });
+  return toJSON(response);
+}

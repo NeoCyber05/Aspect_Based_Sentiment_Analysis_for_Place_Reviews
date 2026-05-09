@@ -70,6 +70,7 @@ type JobData struct {
 	FastMode     bool          `json:"fast_mode"`
 	Radius       int           `json:"radius"`
 	Depth        int           `json:"depth"`
+	MaxPlaces    int           `json:"max_places"`
 	Email        bool          `json:"email"`
 	ExtraReviews bool          `json:"extra_reviews"`
 	MaxTime      time.Duration `json:"max_time"`
@@ -92,6 +93,10 @@ func (d *JobData) Validate() error {
 
 	if d.Depth == 0 {
 		return errors.New("missing depth")
+	}
+
+	if d.MaxPlaces < 0 {
+		return errors.New("invalid max places")
 	}
 
 	if d.MaxTime == 0 {

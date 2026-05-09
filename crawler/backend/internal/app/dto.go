@@ -21,6 +21,7 @@ type createJobRequest struct {
 	FastMode       bool     `json:"fast_mode"`
 	Radius         int      `json:"radius"`
 	Depth          int      `json:"depth"`
+	MaxPlaces      int      `json:"max_places"`
 	Email          bool     `json:"email"`
 	ExtraReviews   bool     `json:"extra_reviews"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
@@ -51,6 +52,7 @@ type jobResponse struct {
 	FastMode       bool     `json:"fast_mode"`
 	Radius         int      `json:"radius"`
 	Depth          int      `json:"depth"`
+	MaxPlaces      int      `json:"max_places"`
 	Email          bool     `json:"email"`
 	ExtraReviews   bool     `json:"extra_reviews"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
@@ -107,6 +109,10 @@ func (r *createJobRequest) validate() error {
 		return fmt.Errorf("depth phải >= 1")
 	}
 
+	if r.MaxPlaces < 0 {
+		return fmt.Errorf("max_places phải >= 0")
+	}
+
 	if r.Lang == "" {
 		r.Lang = "vi"
 	}
@@ -134,6 +140,7 @@ func (r *createJobRequest) toWebJob() web.Job {
 			FastMode:     r.FastMode,
 			Radius:       r.Radius,
 			Depth:        r.Depth,
+			MaxPlaces:    r.MaxPlaces,
 			Email:        r.Email,
 			ExtraReviews: r.ExtraReviews,
 			MaxTime:      time.Duration(r.MaxTimeSeconds) * time.Second,
@@ -158,6 +165,7 @@ func toJobResponse(job web.Job) jobResponse {
 		FastMode:       job.Data.FastMode,
 		Radius:         job.Data.Radius,
 		Depth:          job.Data.Depth,
+		MaxPlaces:      job.Data.MaxPlaces,
 		Email:          job.Data.Email,
 		ExtraReviews:   job.Data.ExtraReviews,
 		MaxTimeSeconds: int(job.Data.MaxTime.Seconds()),
