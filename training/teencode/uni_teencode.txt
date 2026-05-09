@@ -1,0 +1,339 @@
+cntt - công nghệ thông tin
+cnghe - công nghệ
+ctdt - chương trình đào tạo
+ctđt - chương trình đào tạo
+ctrinh - chương trình
+chuongtrinh - chương trình
+chtrinh - chương trình
+csvc - cơ sở vật chất
+daihoc - đại học
+gduc - giáo dục
+gv - giảng viên
+gviên - giảng viên
+gvien - giảng viên
+giangvien - giảng viên
+giang day - giảng dạy
+giangday - giảng dạy
+gdạy - giảng dạy
+gday - giảng dạy
+sv - sinh viên
+sviên - sinh viên
+svien - sinh viên
+sinhvien - sinh viên
+hocsinh - học sinh
+hocvien - học viên
+lophoc - lớp học
+lop hoc - lớp học
+phhoc - phòng học
+phonghoc - phòng học
+phong hoc - phòng học
+monhoc - môn học
+mon hoc - môn học
+bomon - bộ môn
+bo mon - bộ môn
+khoa cntt - khoa công nghệ thông tin
+nganhhoc - ngành học
+nganh hoc - ngành học
+chuyennganh - chuyên ngành
+chuyen nganh - chuyên ngành
+hocky - học kỳ
+hoc ky - học kỳ
+namhoc - năm học
+nam hoc - năm học
+lichhoc - lịch học
+lich hoc - lịch học
+tkb - thời khóa biểu
+thoikhoabieu - thời khóa biểu
+thoi khoa bieu - thời khóa biểu
+tgb - thời gian biểu
+tgian - thời gian
+thgian - thời gian
+thoigian - thời gian
+gio - giờ
+phut - phút
+db - điểm danh
+diemdanh - điểm danh
+diem danh - điểm danh
+chuyencan - chuyên cần
+chuyen can - chuyên cần
+baitap - bài tập
+bai tap - bài tập
+btl - bài tập lớn
+baithi - bài thi
+bai thi - bài thi
+kiemtra - kiểm tra
+kiem tra - kiểm tra
+dethi - đề thi
+de thi - đề thi
+decuong - đề cương
+de cuong - đề cương
+doan - đồ án
+do an - đồ án
+đoan - đồ án
+kltn - khóa luận tốt nghiệp
+kltotnghiep - khóa luận tốt nghiệp
+totnghiep - tốt nghiệp
+tot nghiep - tốt nghiệp
+thai do - thái độ
+thaido - thái độ
+ppgd - phương pháp giảng dạy
+phuongphap - phương pháp
+phuong phap - phương pháp
+pgiangday - phương pháp giảng dạy
+phattrien - phát triển
+phat trien - phát triển
+noidung - nội dung
+noi dung - nội dung
+tailieu - tài liệu
+tai lieu - tài liệu
+giaotrinh - giáo trình
+giao trinh - giáo trình
+slides - slide
+elearning - e-learning
+e learning - e-learning
+online - trực tuyến
+truc tuyen - trực tuyến
+tructuyen - trực tuyến
+offline - trực tiếp
+truc tiep - trực tiếp
+tructiep - trực tiếp
+webinar - hội thảo trực tuyến
+thucte - thực tế
+thuc te - thực tế
+thuchanh - thực hành
+thuc hanh - thực hành
+lythuyet - lý thuyết
+ly thuyet - lý thuyết
+vidu - ví dụ
+vi du - ví dụ
+vd - ví dụ
+minhhoa - minh họa
+minh hoa - minh họa
+bai giang - bài giảng
+baigiang - bài giảng
+giai thich - giải thích
+giaithich - giải thích
+gthich - giải thích
+hdan - hướng dẫn
+huongdan - hướng dẫn
+huong dan - hướng dẫn
+dap an - đáp án
+dapan - đáp án
+cauhoi - câu hỏi
+cau hoi - câu hỏi
+traloi - trả lời
+tra loi - trả lời
+tlai - trả lời
+feedback - phản hồi
+phanhoi - phản hồi
+phan hoi - phản hồi
+gopy - góp ý
+gop y - góp ý
+ykien - ý kiến
+y kien - ý kiến
+yeucau - yêu cầu
+yeu cau - yêu cầu
+danhgia - đánh giá
+danh gia - đánh giá
+diem - điểm
+diemso - điểm số
+diem so - điểm số
+rl - rèn luyện
+drl - điểm rèn luyện
+renluyen - rèn luyện
+ren luyen - rèn luyện
+hocphi - học phí
+hoc phi - học phí
+miengiam - miễn giảm
+mien giam - miễn giảm
+hocbong - học bổng
+hoc bong - học bổng
+khtc - kế hoạch tài chính
+quanly - quản lý
+quan ly - quản lý
+bgh - ban giám hiệu
+bangiamhieu - ban giám hiệu
+ban giam hieu - ban giám hiệu
+phong daotao - phòng đào tạo
+phong dao tao - phòng đào tạo
+ctsv - công tác sinh viên
+phong ctsv - phòng công tác sinh viên
+qldt - quản lý đào tạo
+qlsv - quản lý sinh viên
+gvcn - giáo viên chủ nhiệm
+covanhoctap - cố vấn học tập
+co van hoc tap - cố vấn học tập
+nhanvien - nhân viên
+nhan vien - nhân viên
+bve - bảo vệ
+baove - bảo vệ
+bao ve - bảo vệ
+thuvien - thư viện
+thu vien - thư viện
+ktx - ký túc xá
+kytucxa - ký túc xá
+ky tuc xa - ký túc xá
+canteen - căng tin
+cantin - căng tin
+cangtin - căng tin
+cang tin - căng tin
+nhaxe - nhà xe
+nha xe - nhà xe
+baixe - bãi xe
+bai xe - bãi xe
+wc - nhà vệ sinh
+nvs - nhà vệ sinh
+nhavesinh - nhà vệ sinh
+nha ve sinh - nhà vệ sinh
+vsinh - vệ sinh
+vesinh - vệ sinh
+ve sinh - vệ sinh
+csvc tot - cơ sở vật chất tốt
+thietbi - thiết bị
+thiet bi - thiết bị
+maylanh - máy lạnh
+may lanh - máy lạnh
+dieuhoa - điều hòa
+dieu hoa - điều hòa
+dhòa - điều hòa
+wi-fi - wifi
+wf - wifi
+lab - phòng thí nghiệm
+phong lab - phòng thí nghiệm
+phong thi nghiem - phòng thí nghiệm
+phong may - phòng máy
+phongmay - phòng máy
+maytinh - máy tính
+may tinh - máy tính
+maychieu - máy chiếu
+may chieu - máy chiếu
+mic - micro
+khuonvien - khuôn viên
+khuon vien - khuôn viên
+santruong - sân trường
+san truong - sân trường
+thuvien so - thư viện số
+phongdoc - phòng đọc
+phong doc - phòng đọc
+khong - không
+khg - không
+hok - không
+hong - không
+hông - không
+k0 - không
+chx - chưa
+cx - cũng
+cung - cũng
+cug - cũng
+cũg - cũng
+rat - rất
+rât - rất
+qua - quá
+qá - quá
+wa - quá
+wá - quá
+nhiu - nhiều
+nhieu - nhiều
+n` - nhiều
+duoc - được
+k dc - không được
+ko dc - không được
+khong co - không có
+ko co - không có
+k co - không có
+roi - rồi
+ròi - rồi
+rùi - rồi
+nen co - nên có
+can co - cần có
+good - tốt
+nice - tốt
+oki - ổn
+okie - ổn
+okay - ổn
+okela - ổn
+tot - tốt
+rat tot - rất tốt
+chua tot - chưa tốt
+ko tot - không tốt
+k tot - không tốt
+bad - tệ
+khong tot - không tốt
+dehieu - dễ hiểu
+de hieu - dễ hiểu
+khohieu - khó hiểu
+kho hieu - khó hiểu
+chungchung - chung chung
+cu the - cụ thể
+cuthe - cụ thể
+daydu - đầy đủ
+day du - đầy đủ
+thieu - thiếu
+nhiet tinh - nhiệt tình
+nhiettinh - nhiệt tình
+tantinh - tận tình
+tan tinh - tận tình
+tannhiet - tận nhiệt
+than thien - thân thiện
+thanthien - thân thiện
+gan gui - gần gũi
+gangui - gần gũi
+vui ve - vui vẻ
+vuive - vui vẻ
+vv - vui vẻ
+quan tam - quan tâm
+quantam - quan tâm
+giup do - giúp đỡ
+giupdo - giúp đỡ
+hotro - hỗ trợ
+ho tro - hỗ trợ
+ap luc - áp lực
+apluc - áp lực
+cangthang - căng thẳng
+cang thang - căng thẳng
+thoaimai - thoải mái
+thoai mai - thoải mái
+hailong - hài lòng
+hai long - hài lòng
+thatvong - thất vọng
+that vong - thất vọng
+buc minh - bực mình
+kho chiu - khó chịu
+ngan - ngán
+dung gio - đúng giờ
+dunggio - đúng giờ
+linhhoat - linh hoạt
+linh hoat - linh hoạt
+hieuqua - hiệu quả
+hieu qua - hiệu quả
+chatluong - chất lượng
+chat luong - chất lượng
+nang cao - nâng cao
+nangcao - nâng cao
+doi moi - đổi mới
+doimoi - đổi mới
+ung dung - ứng dụng
+ungdung - ứng dụng
+cong ty - công ty
+congty - công ty
+thamquan - tham quan
+ngoaingu - ngoại ngữ
+ngoai ngu - ngoại ngữ
+nna - ngôn ngữ anh
+tienganh - tiếng anh
+tieng anh - tiếng anh
+ttnt - trí tuệ nhân tạo
+dulieu - dữ liệu
+du lieu - dữ liệu
+nx - nữa
+ntn - như thế nào
+nch - nói chung
+vđ - vấn đề
+vde - vấn đề
+trc - trước
+nhg - nhưng
+gk - giữa kỳ
+gtr - giáo trình
+clb - câu lạc bộ
+kgian - không gian
+hssv - học sinh sinh viên
