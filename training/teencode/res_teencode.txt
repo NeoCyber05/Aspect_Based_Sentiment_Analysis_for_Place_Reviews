@@ -1,0 +1,184 @@
+ko - không
+k - không
+kh - không
+khg - không
+khong - không
+dc - được
+đc - được
+đk - được
+đx - được
+ts - trà sữa
+trsua - trà sữa
+cf - cà phê
+cafe - cà phê
+cfê - cà phê
+bth - bình thường
+bt - bình thường
+bthuong - bình thường
+nv - nhân viên
+nviên - nhân viên
+nhviên - nhân viên
+pv - phục vụ
+pvụ - phục vụ
+pvu - phục vụ
+nvpv - nhân viên phục vụ
+dv - dịch vụ
+cskh - chăm sóc khách hàng
+ql - quản lý
+bve - bảo vệ
+kgian - không gian
+kg - không gian
+k/g - không gian
+cl - chất lượng
+clg - chất lượng
+chất lg - chất lượng
+mng - mọi người
+mn - mọi người
+qán - quán
+qan - quán
+đ.ăn - đồ ăn
+doan - đồ ăn
+đ.uống - đồ uống
+douong - đồ uống
+viu - cảnh
+view - cảnh
+j - gì
+gìi - gì
+r - rồi
+rùi - rồi
+ròi - rồi
+qá - quá
+nchung - nói chung
+ntn - như thế nào
+qlai - quay lại
+vs - với
+vch - vãi chưởng
+vl - vãi
+v~ - vãi
+ng0n - ngon
+ngon xỉu - rất ngon
+đỉnh - tuyệt vời
+ổn áp - tốt
+rv - đánh giá
+oder - gọi món
+scl - socola
+thik - thích
+thjk - thích
+thjc	thích
+nx - nhận xét
+mún - muốn
+ms - mới
+mik - mình
+thui - thôi
+lun - luôn
+gud - tốt
+rep - trả lời
+hok - không
+hông - không
+hong - không
+hem - không
+hơm - không
+kp - không phải
+kphai - không phải
+kbt - không biết
+btiet - biết
+thuii - thôi
+thoy - thôi
+luônn - luôn
+lunn - luôn
+nhaa - nhé
+nek - này
+điiii - đi
+cf - cà phê
+qcf - quán cà phê
+q ts - quán trà sữa
+shipp - giao hàng
+mangve - mang về
+mang về - mang về
+ăn tại quán - ăn tại chỗ
+datban - đặt bàn
+booking - đặt bàn
+oder món - gọi món
+ord món - gọi món
+lên món - lên món
+lenmon - lên món
+ra món - ra món
+ramon - ra món
+chờ món - chờ món
+chomon - chờ món
+full topping - đầy đủ topping
+fulltop - đầy đủ topping
+ít đá - ít đá
+itda - ít đá
+itduong - ít đường
+full đường - nhiều đường
+fullda - nhiều đá
+ngonn - ngon
+ngonng - ngon
+ngon vl - rất ngon
+ngon vch - rất ngon
+ngon bá cháy - rất ngon
+ngon bá chấy - rất ngon
+ngon xĩu - rất ngon
+ngon xỉuu - rất ngon
+ngon nhức nách - rất ngon
+ngon phết - khá ngon
+ngon ổn - khá ngon
+te - tệ
+tệ vl - rất tệ
+tệ vkl - rất tệ
+ngot - ngọt
+beo - béo
+thom - thơm
+hop khau vi - hợp khẩu vị
+vsinh - vệ sinh
+giaca - giá cả
+giá ok - giá hợp lý
+giá ổn - giá hợp lý
+re - rẻ
+mắc - đắt
+giá chát - giá đắt
+dat - đắt
+hơi chát - đắt
+chat - đắt
+xứng tiền - đáng tiền
+dang tien - đáng tiền
+ko đáng tiền - không đáng tiền
+k đáng tiền - không đáng tiền
+khumgian - không gian
+khônggian - không gian
+decor - trang trí
+deco - trang trí
+trí - trang trí
+xịn - tốt
+chill - thư giãn
+chilll - thư giãn
+sống ảo - chụp ảnh đẹp
+checkin - chụp ảnh
+check-in - chụp ảnh
+yentinh - yên tĩnh
+nvien - nhân viên
+nhanvien - nhân viên
+nv - nhân viên
+phucvu - phục vụ
+pv - phục vụ
+phục vụ ok - phục vụ tốt
+pv ok - phục vụ tốt
+pv tệ - phục vụ tệ
+nv dth - nhân viên dễ thương
+dth - dễ thương
+thanthien - thân thiện
+nhiettinh - nhiệt tình
+kho chiu - khó chịu
+thái độ lồi lõm - thái độ tệ
+trainghiem - trải nghiệm
+recommend - đề xuất
+recm - đề xuất
+rec - đề xuất
+highly recommend - rất đề xuất
+ko recommend - không đề xuất
+k recommend - không đề xuất
+dang thu - đáng thử
+nen thu - nên thử
+se qlai - quay lại
+qlai - quay lại
