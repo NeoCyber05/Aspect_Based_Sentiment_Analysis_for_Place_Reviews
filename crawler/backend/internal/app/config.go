@@ -16,8 +16,7 @@ type Config struct {
 	Proxies          []string
 	PollInterval     time.Duration
 	PythonBin        string
-	ABSACheckpoint   string
-	ABSAModel        string
+	ABSARepoID       string
 	ABSATeencodePath string
 }
 
@@ -34,9 +33,8 @@ func ParseConfig() (*Config, error) {
 	flag.StringVar(&proxyCSV, "proxies", "", "danh sách proxy cách nhau bằng dấu phẩy")
 	flag.DurationVar(&cfg.PollInterval, "poll-interval", time.Second, "chu kỳ quét job pending")
 	flag.StringVar(&cfg.PythonBin, "python-bin", "python", "binary Python để chạy ABSA pipeline")
-	flag.StringVar(&cfg.ABSACheckpoint, "absa-checkpoint", "", "đường dẫn checkpoint ABSA .pt")
-	flag.StringVar(&cfg.ABSAModel, "absa-model", "intfloat/multilingual-e5-small", "pretrained model name dùng khi load checkpoint ABSA")
-	flag.StringVar(&cfg.ABSATeencodePath, "absa-teencode-path", "../../training/teencode/hotel_teencode.txt", "đường dẫn file teencode cho ABSA")
+	flag.StringVar(&cfg.ABSARepoID, "absa-repo-id", "NeoCyber/m-e5-small-vlsp2018-restaurant", "Hugging Face repo chứa weight ABSA")
+	flag.StringVar(&cfg.ABSATeencodePath, "absa-teencode-path", "training/teencode/res_teencode.txt", "đường dẫn file teencode cho ABSA")
 	flag.Parse()
 
 	if cfg.Concurrency < 1 {

@@ -20,9 +20,9 @@ func newReviewAnalyzer(cfg *Config) *reviewAnalyzer {
 }
 
 func (a *reviewAnalyzer) analyzeCSV(ctx context.Context, csvPath string) (map[string]any, error) {
-	checkpoint := strings.TrimSpace(a.cfg.ABSACheckpoint)
-	if checkpoint == "" {
-		return nil, fmt.Errorf("chưa cấu hình checkpoint ABSA, hãy chạy backend với -absa-checkpoint")
+	repoID := strings.TrimSpace(a.cfg.ABSARepoID)
+	if repoID == "" {
+		return nil, fmt.Errorf("chưa cấu hình Hugging Face repo ABSA, hãy chạy backend với -absa-repo-id")
 	}
 
 	projectRoot, err := resolveProjectRoot()
@@ -33,14 +33,15 @@ func (a *reviewAnalyzer) analyzeCSV(ctx context.Context, csvPath string) (map[st
 	args := []string{
 		"-m", "review_absa_pipeline.run_from_csv",
 		"--input-csv", csvPath,
-		"--checkpoint", checkpoint,
-		"--pretrained-model", strings.TrimSpace(a.cfg.ABSAModel),
+		"--model-repo-id", repoID,
 	}
 	if teencodePath := strings.TrimSpace(a.cfg.ABSATeencodePath); teencodePath != "" {
 		args = append(args, "--teencode-path", teencodePath)
 	}
 
-	cmd := exec.CommandContext(ctx, strings.TrimSpace(a.cfg.PythonBin), args...)
+	pythonBin := resolvePythonBin(projectRoot, a.cfg.PythonBin)
+
+	cmd := exec.CommandContext(ctx, pythonBin, args...)
 	cmd.Dir = projectRoot
 
 	var stdout bytes.Buffer
@@ -58,6 +59,28 @@ func (a *reviewAnalyzer) analyzeCSV(ctx context.Context, csvPath string) (map[st
 	}
 
 	return payload, nil
+}
+
+func resolvePythonBin(projectRoot, configured string) string {
+	pythonBin := strings.TrimSpace(configured)
+	if pythonBin != "" && pythonBin != "python" {
+		return pythonBin
+	}
+
+	candidates := []string{
+		filepath.Join(projectRoot, ".venv", "Scripts", "python.exe"),
+		filepath.Join(projectRoot, ".venv", "bin", "python"),
+	}
+	for _, candidate := range candidates {
+		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+			return candidate
+		}
+	}
+
+	if pythonBin == "" {
+		return "python"
+	}
+	return pythonBin
 }
 
 func resolveProjectRoot() (string, error) {

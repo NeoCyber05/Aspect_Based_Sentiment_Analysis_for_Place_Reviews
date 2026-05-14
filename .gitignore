@@ -1,3 +1,9 @@
 ml_pipeline
 full_pipeline.ipynb
 training/outputs/
+.venv/
+__pycache__/
+*.pyc
+training/final_weight/
+crawler/backend/crawler/data/*.db-shm
+crawler/backend/crawler/data/*.db-wal

@@ -109,6 +109,18 @@ function prettifyAspectName(raw) {
     .trim();
 }
 
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Number(value || 0)));
+}
+
+function scoreText(value) {
+  return `${Number(value || 0).toFixed(1)}/5`;
+}
+
+function visibleAspects(aspects) {
+  return (Array.isArray(aspects) ? aspects : []).filter((item) => Number(item.mentions || 0) > 0);
+}
+
 function formatCoordinate(value) {
   return Number(value).toFixed(6);
 }
@@ -169,6 +181,68 @@ async function fetchVietMap(path, params, signal) {
   }
 
   return data;
+}
+
+function AspectRows({ aspects, limit }) {
+  const rows = Array.isArray(aspects) ? aspects : [];
+  const shownRows = typeof limit === "number" ? rows.slice(0, limit) : rows;
+
+  if (shownRows.length === 0) {
+    return <p className="empty-analysis">Chưa có aspect nào được model nhận diện.</p>;
+  }
+
+  return (
+    <div className="aspect-list">
+      {shownRows.map((item) => {
+        const scorePercent = clampPercent(item.score_percent);
+        const negative = Number(item.negative_percent || 0);
+        return (
+          <article className="aspect-row" key={item.aspect}>
+            <div className="aspect-label">
+              <strong>{prettifyAspectName(item.aspect)}</strong>
+              <small>{item.mentions || 0} lượt đề cập</small>
+            </div>
+            <div className="aspect-meter-wrap">
+              <div className="aspect-meter">
+                <div className="aspect-meter-track" />
+                <div
+                  className={`aspect-meter-fill ${negative >= 45 ? "negative" : "positive"}`}
+                  style={{ width: `${scorePercent}%` }}
+                />
+              </div>
+              <span className="aspect-score">{scoreText(item.score_5)}</span>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlaceAnalysis({ places }) {
+  const rows = Array.isArray(places) ? places : [];
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="place-analysis-list">
+      {rows.map((place, index) => {
+        const aspects = visibleAspects(place.aspects);
+        const overall = place.overall || {};
+        return (
+          <article className="place-analysis" key={place.input_id || `${place.title}-${index}`}>
+            <div className="place-analysis-heading">
+              <div>
+                <strong>{place.title || `Địa điểm ${index + 1}`}</strong>
+                <span>{place.description_count || 0} review có nội dung</span>
+              </div>
+              <span className="place-score">{scoreText(overall.score_5)}</span>
+            </div>
+            <AspectRows aspects={aspects} limit={5} />
+          </article>
+        );
+      })}
+    </div>
+  );
 }
 
 function PlacePicker({ apiKey, onPick, selectedLocation }) {
@@ -958,8 +1032,8 @@ export default function App() {
           </div>
 
           <div className="aspect-list">
-            {(analysisResult.aspects || []).map((item) => {
-              const scorePercent = Number(item.score_percent || 0);
+            {visibleAspects(analysisResult.aspects).map((item) => {
+              const scorePercent = clampPercent(item.score_percent);
               const negative = Number(item.negative_percent || 0);
               return (
                 <article className="aspect-row" key={item.aspect}>
@@ -972,14 +1046,22 @@ export default function App() {
                       <div className="aspect-meter-track" />
                       <div
                         className={`aspect-meter-fill ${negative >= 45 ? "negative" : "positive"}`}
-                        style={{ width: `${Math.max(0, Math.min(100, scorePercent))}%` }}
+                        style={{ width: `${scorePercent}%` }}
                       />
                     </div>
-                    <span className="aspect-score">{Number(item.score_5 || 0).toFixed(1)}/5</span>
+                    <span className="aspect-score">{scoreText(item.score_5)}</span>
                   </div>
                 </article>
               );
             })}
+          </div>
+
+          <div className="place-analysis-section">
+            <div className="section-heading">
+              <h3>Trung bình theo địa điểm</h3>
+              <span>{analysisResult.places?.length || 0} địa điểm</span>
+            </div>
+            <PlaceAnalysis places={analysisResult.places} />
           </div>
         </section>
       )}

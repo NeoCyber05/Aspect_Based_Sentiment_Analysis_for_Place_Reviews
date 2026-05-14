@@ -32,7 +32,7 @@ func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 			Handler:           withCORS(handler),
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      60 * time.Second,
+			WriteTimeout:      10 * time.Minute,
 			IdleTimeout:       90 * time.Second,
 		},
 	}

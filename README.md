@@ -75,3 +75,31 @@ npm install
 npm run dev
 ```
 
+## Load Published Weights
+
+The published Hugging Face models can be loaded directly after cloning this repo.
+
+Install the Python dependencies you need for inference:
+
+```bash
+pip install torch transformers safetensors sentencepiece huggingface_hub
+```
+
+Run a quick load test:
+
+```bash
+python load_hf_model.py --repo-id NeoCyber/m-e5-small-vlsp2018-hotel --text "Phòng sạch sẽ, nhân viên thân thiện"
+```
+
+Available model repos:
+
+- `NeoCyber/m-e5-small-hosrev`
+- `NeoCyber/m-e5-small-uit-vsfc-uni`
+- `NeoCyber/m-e5-small-vlsp2018-hotel`
+- `NeoCyber/m-e5-small-vlsp2018-restaurant`
+
+Notes:
+
+- Keep `hf_absa_model/` in the repo if you want to preserve the local source of the custom architectures.
+- `push_hf_ready_models.py` is only for uploading exported folders to Hugging Face. It is not needed for inference.
+
