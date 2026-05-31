@@ -1,7 +1,10 @@
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobAnalysis, fetchJobs } from "./api";
+import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobAnalysis, fetchJobs, generateJobNarrative } from "./api";
+import { SentimentBar } from "./components/SentimentBar";
+import { NarrativePanel } from "./components/NarrativePanel";
+import { aspectDisplayName } from "./utils/aspectDisplay";
 
 const vietMapApiKey = import.meta.env.VITE_VIETMAP_API_KEY?.trim() || "";
 const vietMapApiBase = "https://maps.vietmap.vn/api";
@@ -92,10 +95,10 @@ const statusLabels = {
 };
 
 const analysisStatusLabels = {
-  pending: "Chua phan tich",
-  working: "Dang phan tich",
-  ok: "Da phan tich",
-  failed: "Loi phan tich"
+  pending: "Chưa phân tích",
+  working: "Đang phân tích",
+  ok: "Đã phân tích",
+  failed: "Lỗi phân tích"
 };
 
 function formatDate(isoString) {
@@ -108,7 +111,7 @@ function statusText(status) {
 }
 
 function analysisStatusText(status) {
-  return analysisStatusLabels[status] || status || "Chua phan tich";
+  return analysisStatusLabels[status] || status || "Chưa phân tích";
 }
 
 function prettifyAspectName(raw) {
@@ -136,22 +139,23 @@ function visibleAspects(aspects) {
   return (Array.isArray(aspects) ? aspects : []).filter((item) => Number(item.mentions || 0) > 0);
 }
 
+// Chuyển đổi ngành hàng sang bảng dữ liệu
 function domainSummaryRows(summary) {
   const domains = summary?.domains || {};
   return Object.entries(domains).map(([domain, metrics]) => ({ domain, ...metrics }));
 }
 
 function analysisButtonLabel(job, busy) {
-  if (busy) return "Dang tai...";
+  if (busy) return "Đang tải...";
   switch (job.analysis_status) {
     case "ok":
-      return "Xem phan tich";
+      return "Xem phân tích";
     case "failed":
-      return "Chay lai";
+      return "Chạy lại";
     case "working":
-      return "Dang phan tich";
+      return "Đang phân tích";
     default:
-      return "Chay phan tich";
+      return "Chạy phân tích";
   }
 }
 
@@ -222,33 +226,24 @@ function AspectRows({ aspects, limit }) {
   const shownRows = typeof limit === "number" ? rows.slice(0, limit) : rows;
 
   if (shownRows.length === 0) {
-    return <p className="empty-analysis">Chưa có aspect nào được model nhận diện.</p>;
+    return <p className="empty-analysis">Chưa có khía cạnh (aspect) nào được nhận diện.</p>;
   }
 
   return (
     <div className="aspect-list">
-      {shownRows.map((item) => {
-        const scorePercent = clampPercent(item.score_percent);
-        const negative = Number(item.negative_percent || 0);
-        return (
-          <article className="aspect-row" key={item.aspect}>
-            <div className="aspect-label">
-              <strong>{prettifyAspectName(item.aspect)}</strong>
-              <small>{item.mentions || 0} lượt đề cập</small>
-            </div>
-            <div className="aspect-meter-wrap">
-              <div className="aspect-meter">
-                <div className="aspect-meter-track" />
-                <div
-                  className={`aspect-meter-fill ${negative >= 45 ? "negative" : "positive"}`}
-                  style={{ width: `${scorePercent}%` }}
-                />
-              </div>
-              <span className="aspect-score">{scoreText(item.score_5)}</span>
-            </div>
-          </article>
-        );
-      })}
+      {shownRows.map((item) => (
+        <article className="aspect-row" key={item.aspect}>
+          <div className="aspect-label">
+            <strong>{aspectDisplayName(item)}</strong>
+            <small>{item.mentions || 0} lượt đề cập</small>
+          </div>
+          <SentimentBar
+            positive={item.positive || 0}
+            neutral={item.neutral || 0}
+            negative={item.negative || 0}
+          />
+        </article>
+      ))}
     </div>
   );
 }
@@ -277,7 +272,7 @@ function PlaceAnalysis({ places }) {
             {Array.isArray(place.top_negative_aspects) && place.top_negative_aspects.length > 0 && (
               <div className="mini-insight-list">
                 {place.top_negative_aspects.slice(0, 3).map((item) => (
-                  <span key={item.aspect}>{prettifyAspectName(item.aspect)}: {percentText(item.negative_percent)} negative</span>
+                  <span key={item.aspect}>{aspectDisplayName(item)}: {percentText(item.negative_percent)} tiêu cực</span>
                 ))}
               </div>
             )}
@@ -288,8 +283,8 @@ function PlaceAnalysis({ places }) {
                   <blockquote key={`${place.input_id || index}-${evidenceIndex}`}>
                     <p>{item.text}</p>
                     <footer>
-                      {item.rating ? `${item.rating} sao` : "Khong co rating"}
-                      {item.negative_aspects?.length ? ` · ${item.negative_aspects.map(prettifyAspectName).join(", ")}` : ""}
+                      {item.rating ? `${item.rating} sao` : "Không có rating"}
+{item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
                     </footer>
                   </blockquote>
                 ))}
@@ -308,24 +303,24 @@ function InsightCards({ result }) {
   return (
     <div className="insight-grid">
       <article>
-        <span>Diem tong quan</span>
-        <strong>{scoreText(overall.score_5)}</strong>
-        <small>{overall.mentions || 0} luot aspect duoc nhan dien</small>
+        <span>Tổng quan cảm xúc</span>
+        <strong>{percentText(overall.positive_percent)}</strong>
+        <small>{overall.positive || 0} tích cực · {overall.negative || 0} tiêu cực</small>
       </article>
       <article>
-        <span>Ty le negative</span>
+        <span>Tỷ lệ tiêu cực</span>
         <strong>{percentText(overall.negative_percent)}</strong>
-        <small>{overall.negative || 0} negative mentions</small>
+        <small>{overall.negative || 0} lượt đề cập tiêu cực</small>
       </article>
       <article>
-        <span>Dia diem</span>
+        <span>Địa điểm</span>
         <strong>{result?.place_count || 0}</strong>
-        <small>{result?.description_count || 0} review co noi dung</small>
+        <small>{result?.description_count || 0} review có nội dung</small>
       </article>
       <article>
-        <span>Lech sao/noi dung</span>
+        <span>Lệch sao / nội dung</span>
         <strong>{ratingVsText.mismatch_count || 0}</strong>
-        <small>{ratingVsText.total_with_rating || 0} review co rating</small>
+        <small>{ratingVsText.total_with_rating || 0} review có rating</small>
       </article>
     </div>
   );
@@ -334,14 +329,14 @@ function InsightCards({ result }) {
 function AlertsList({ alerts }) {
   const rows = Array.isArray(alerts) ? alerts : [];
   if (rows.length === 0) {
-    return <p className="empty-analysis">Chua co canh bao negative noi bat.</p>;
+    return <p className="empty-analysis">Chưa có cảnh báo tiêu cực nổi bật.</p>;
   }
   return (
     <div className="alert-list">
       {rows.slice(0, 6).map((item) => (
         <article key={item.aspect}>
-          <strong>{prettifyAspectName(item.aspect)}</strong>
-          <span>{item.negative || 0}/{item.mentions || 0} negative · {percentText(item.negative_percent)}</span>
+          <strong>{aspectDisplayName(item)}</strong>
+          <span>{item.negative || 0}/{item.mentions || 0} tiêu cực · {percentText(item.negative_percent)}</span>
         </article>
       ))}
     </div>
@@ -358,14 +353,14 @@ function DomainSummary({ summary }) {
         {rows.map((item) => (
           <article key={item.domain}>
             <strong>{item.domain}</strong>
-            <span>{item.place_count || 0} dia diem · {item.review_count || 0} reviews</span>
-            <small>confidence {Number(item.avg_confidence || 0).toFixed(2)}</small>
+            <span>{item.place_count || 0} địa điểm · {item.review_count || 0} reviews</span>
+            <small>Độ tin cậy {Number(item.avg_confidence || 0).toFixed(2)}</small>
           </article>
         ))}
       </div>
       {lowConfidence.length > 0 && (
         <div className="low-confidence">
-          <strong>Can kiem tra domain routing</strong>
+          <strong>Cần kiểm tra domain routing</strong>
           {lowConfidence.slice(0, 5).map((item) => (
             <span key={`${item.input_id}-${item.domain}`}>
               {item.title || item.input_id}: {item.domain} ({Number(item.confidence || 0).toFixed(2)})
@@ -387,7 +382,7 @@ function RatingMismatch({ data }) {
           <p>{item.text}</p>
           <footer>
             {item.title || item.input_id} · {item.rating} sao
-            {item.negative_aspects?.length ? ` · negative: ${item.negative_aspects.map(prettifyAspectName).join(", ")}` : ""}
+            {item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
           </footer>
         </blockquote>
       ))}
@@ -400,33 +395,35 @@ function AnalysisDashboard({ result, jobID }) {
     <section className="panel analysis-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">ABSA tong hop</p>
-          <h2>Ket qua phan tich review</h2>
+          <p className="eyebrow">ABSA tổng hợp</p>
+          <h2>Kết quả phân tích review</h2>
         </div>
-        <span className="job-count">Job: {jobID}</span>
+        <span className="job-count">Job ID: {jobID}</span>
       </div>
 
       <div className="analysis-meta">
-        <span>{result.place_count || 0} dia diem</span>
-        <span>{result.description_count || 0} review hop le</span>
-        <span>{result.generated_at ? `Cap nhat ${formatDate(result.generated_at)}` : "Snapshot moi nhat"}</span>
+        <span>{result.place_count || 0} địa điểm</span>
+        <span>{result.description_count || 0} review hợp lệ</span>
+        <span>{result.generated_at ? `Cập nhật ${formatDate(result.generated_at)}` : "Snapshot mới nhất"}</span>
       </div>
 
       <InsightCards result={result} />
 
+      <NarrativePanel jobID={jobID} onGenerate={generateJobNarrative} />
+
       <div className="analysis-columns">
         <section>
           <div className="section-heading">
-            <h3>Van de can uu tien</h3>
-            <span>{result.alerts?.length || 0} canh bao</span>
+            <h3>Vấn đề cần ưu tiên</h3>
+            <span>{result.alerts?.length || 0} cảnh báo</span>
           </div>
           <AlertsList alerts={result.alerts} />
         </section>
 
         <section>
           <div className="section-heading">
-            <h3>Domain routing</h3>
-            <span>{domainSummaryRows(result.domain_summary).length} domain</span>
+            <h3>Phân tích ngành hàng (Domain Routing)</h3>
+            <span>{domainSummaryRows(result.domain_summary).length} ngành hàng</span>
           </div>
           <DomainSummary summary={result.domain_summary} />
         </section>
@@ -434,15 +431,15 @@ function AnalysisDashboard({ result, jobID }) {
 
       <div className="place-analysis-section">
         <div className="section-heading">
-          <h3>Aspect tong hop</h3>
-          <span>{visibleAspects(result.aspects).length} aspect</span>
+          <h3>Khía cạnh tổng hợp (Aspects)</h3>
+          <span>{visibleAspects(result.aspects).length} khía cạnh</span>
         </div>
         <AspectRows aspects={visibleAspects(result.aspects)} />
       </div>
 
       <div className="place-analysis-section">
         <div className="section-heading">
-          <h3>Lech giua sao va noi dung</h3>
+          <h3>Lệch giữa rating và nội dung</h3>
           <span>{result.rating_vs_text?.mismatch_count || 0} review</span>
         </div>
         <RatingMismatch data={result.rating_vs_text} />
@@ -450,8 +447,8 @@ function AnalysisDashboard({ result, jobID }) {
 
       <div className="place-analysis-section">
         <div className="section-heading">
-          <h3>Trung binh theo dia diem</h3>
-          <span>{result.places?.length || 0} dia diem</span>
+          <h3>Trung bình theo địa điểm</h3>
+          <span>{result.places?.length || 0} địa điểm</span>
         </div>
         <PlaceAnalysis places={result.places} />
       </div>
@@ -480,7 +477,7 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
 
     const lngLat = [lng, lat];
     if (!markerRef.current) {
-      markerRef.current = new vietmapgl.Marker({ color: "#2563eb" }).setLngLat(lngLat).addTo(mapRef.current);
+      markerRef.current = new vietmapgl.Marker({ color: "#0284c7" }).setLngLat(lngLat).addTo(mapRef.current);
     } else {
       markerRef.current.setLngLat(lngLat);
     }
@@ -735,7 +732,7 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
       <div className="panel-heading">
         <div>
           <p className="eyebrow">VietMap</p>
-          <h2>Chọn địa điểm</h2>
+          <h2>Chọn địa điểm trên bản đồ</h2>
         </div>
         <span className={`map-state ${mapState}`}>
           {mapState === "ready"
@@ -756,7 +753,7 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
           onChange={(event) => setQuery(event.target.value)}
           disabled={!apiKey || mapState === "error"}
           autoComplete="off"
-          placeholder="Nhập tên quán, địa chỉ hoặc địa danh"
+          placeholder="Nhập tên quán, địa chỉ hoặc địa danh..."
         />
         {(suggestions.length > 0 || searching || searchError) && (
           <div className="suggestions" role="listbox">
@@ -783,30 +780,118 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
 
       <div className="map-canvas-wrap">
         <div ref={mapElementRef} className="map-canvas" />
+        {selectedLocation && (
+          <div className="map-scope-card">
+            <span className="scope-pulse place" aria-hidden="true" />
+            <div>
+              <strong>Địa điểm được chọn</strong>
+              <span>
+                {formatCoordinate(selectedLocation.lat)}, {formatCoordinate(selectedLocation.lng)}
+              </span>
+            </div>
+          </div>
+        )}
         {!apiKey && (
           <div className="map-placeholder">
             <strong>VietMap chưa được cấu hình</strong>
-            <span>Thêm VITE_VIETMAP_API_KEY vào .env.local để bật bản đồ.</span>
+            <span>Thêm VITE_VIETMAP_API_KEY vào file .env.local để kích hoạt bản đồ VietMap.</span>
           </div>
         )}
         {apiKey && mapState === "loading" && (
           <div className="map-placeholder">
             <strong>Đang tải bản đồ</strong>
-            <span>Form thủ công vẫn có thể sử dụng trong lúc chờ.</span>
+            <span>Giao diện nhập thủ công bên cạnh vẫn có thể sử dụng.</span>
           </div>
         )}
         {apiKey && mapState === "error" && (
           <div className="map-placeholder error-state">
             <strong>Không tải được VietMap</strong>
-            <span>{pickStatus || "Kiểm tra API key VietMap và quyền dùng TileMap/Web SDK."}</span>
+            <span>{pickStatus || "Hãy kiểm tra API key VietMap và quyền sử dụng Web SDK."}</span>
           </div>
         )}
       </div>
 
       <div className="map-footer">
         <span>
-          {pickStatus || "Tìm địa điểm bằng ô phía trên hoặc click bản đồ để lấy tọa độ và địa chỉ gần nhất."}
+          {pickStatus || "Tìm địa điểm bằng thanh tìm kiếm hoặc click trực tiếp lên bản đồ để lấy tọa độ và địa chỉ."}
         </span>
+      </div>
+    </section>
+  );
+}
+
+function SummaryMetrics({ jobs, completedJobs, analysisReadyJobs, workingJobs }) {
+  const failedJobs = jobs.filter((job) => job.status === "failed").length;
+  const pendingAnalysis = completedJobs.filter((job) => (job.analysis_status || "pending") !== "ok").length;
+
+  return (
+    <section className="metric-strip" aria-label="Tổng quan dữ liệu và phân tích">
+      <article>
+        <span>Số job đã cào</span>
+        <strong>{jobs.length}</strong>
+        <small>{workingJobs.length} đang xử lý</small>
+      </article>
+      <article>
+        <span>Crawl thành công</span>
+        <strong>{completedJobs.length}</strong>
+        <small>{failedJobs} cào thất bại</small>
+      </article>
+      <article>
+        <span>Đã chạy ABSA</span>
+        <strong>{analysisReadyJobs.length}</strong>
+        <small>{pendingAnalysis} job chờ phân tích</small>
+      </article>
+      <article>
+        <span>Luồng thông minh</span>
+        <strong>Thu thập → ABSA</strong>
+        <small>Mô hình cảm xúc khía cạnh</small>
+      </article>
+    </section>
+  );
+}
+
+function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze }) {
+  return (
+    <section className="panel analysis-queue">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Bộ lưu trữ ABSA</p>
+          <h2>Danh sách các Job đã hoàn tất dữ liệu cào</h2>
+        </div>
+        <span className="job-count">{jobs.length} job đã sẵn sàng</span>
+      </div>
+
+      <div className="analysis-job-grid">
+        {jobs.length === 0 ? (
+          <p className="empty-analysis">Chưa có dữ liệu nào sẵn sàng. Vui lòng chuyển sang tab Thu Thập Dữ Liệu để tạo job mới.</p>
+        ) : (
+          jobs.map((job) => {
+            const busy = analyzingJobID === job.id;
+            const analysisStatus = job.analysis_status || "pending";
+            const analysisReady = analysisStatus === "ok";
+            const analysisWorking = analysisStatus === "working";
+            return (
+              <article className="analysis-job-card" key={job.id}>
+                <div className="analysis-job-card-header">
+                  <strong>{job.name}</strong>
+                  <span>Từ khóa: {job.keywords?.join(", ") || "-"}</span>
+                </div>
+                <div className="analysis-job-meta">
+                  <span className={`status ${job.status}`}>{statusText(job.status)}</span>
+                  <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
+                </div>
+                <button
+                  type="button"
+                  className={`ghost-button ${analysisReady ? "success-action" : "pending-action"}`}
+                  onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
+                  disabled={job.status !== "ok" || busy || analysisWorking}
+                >
+                  {analysisButtonLabel(job, busy)}
+                </button>
+              </article>
+            );
+          })
+        )}
       </div>
     </section>
   );
@@ -820,10 +905,13 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [activeScreen, setActiveScreen] = useState("analysis");
   const [activeTab, setActiveTab] = useState("full");
+  const [analysisMode, setAnalysisMode] = useState("area");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisJobID, setAnalysisJobID] = useState("");
   const [analyzingJobID, setAnalyzingJobID] = useState("");
+  const [jobToDelete, setJobToDelete] = useState(null);
 
   const keywords = useMemo(
     () =>
@@ -845,6 +933,22 @@ export default function App() {
     () => jobs.filter((job) => (job.crawl_mode || "full") === activeTab),
     [activeTab, jobs]
   );
+
+  const completedJobs = useMemo(() => jobs.filter((job) => job.status === "ok"), [jobs]);
+  const workingJobs = useMemo(() => jobs.filter((job) => job.status === "working" || job.status === "pending"), [jobs]);
+  const analysisReadyJobs = useMemo(
+    () => jobs.filter((job) => (job.analysis_status || "pending") === "ok"),
+    [jobs]
+  );
+  const analysisJobs = useMemo(
+    () =>
+      jobs.filter((job) => {
+        const crawlMode = job.crawl_mode || "full";
+        return crawlMode === "full" && (job.status === "ok" || job.analysis_status);
+      }),
+    [jobs]
+  );
+  const selectedAnalysisJob = useMemo(() => jobs.find((job) => job.id === analysisJobID), [analysisJobID, jobs]);
 
   async function loadJobs() {
     setLoadingJobs(true);
@@ -879,12 +983,12 @@ export default function App() {
     setError("");
     setMessage(
       selection.name
-        ? `Đã điền thông tin từ địa điểm: ${selection.name}`
-        : "Đã cập nhật kinh độ và vĩ độ từ bản đồ."
+        ? `Đã điền thông tin địa điểm: ${selection.name}`
+        : "Đã cập nhật tọa độ từ bản đồ."
     );
   }, []);
 
-  async function onSubmit(event) {
+  async function onSubmit(event, overrides = {}) {
     event.preventDefault();
     setMessage("");
     setError("");
@@ -908,22 +1012,24 @@ export default function App() {
         zoom: Number(form.zoom),
         lat: form.lat.trim(),
         lon: form.lon.trim(),
-        fast_mode: form.fastMode,
-        radius: Number(form.radius),
+        fast_mode: overrides.fastMode ?? form.fastMode,
+        radius: Number(overrides.radius ?? form.radius),
         depth: Number(form.depth),
-        max_places: Number(form.maxPlaces),
+        max_places: Number(overrides.maxPlaces ?? form.maxPlaces),
         email: form.email,
         extra_reviews: form.extraReviews,
         max_time_seconds: Number(form.maxTimeSeconds),
-        crawl_mode: form.crawlMode
+        crawl_mode: overrides.crawlMode ?? form.crawlMode
       };
 
-      if (!batchMode) {
+      const submitBatchMode = overrides.batchMode ?? batchMode;
+
+      if (!submitBatchMode) {
         await createJob({
           ...commonPayload,
           keywords
         });
-        setMessage("Đã tạo job thành công.");
+        setMessage("Đã khởi tạo job cào dữ liệu thành công.");
       } else {
         const settled = await Promise.allSettled(
           keywords.map((keyword) =>
@@ -936,7 +1042,7 @@ export default function App() {
         );
         const successCount = settled.filter((item) => item.status === "fulfilled").length;
         const failedCount = settled.length - successCount;
-        setMessage(`Batch hoàn tất: ${successCount} thành công, ${failedCount} lỗi.`);
+        setMessage(`Đã hoàn tất gửi loạt: ${successCount} thành công, ${failedCount} thất bại.`);
       }
 
       setForm((prev) => ({ ...initialForm, lang: prev.lang }));
@@ -948,12 +1054,12 @@ export default function App() {
     }
   }
 
-  async function onDelete(jobID) {
+  async function deleteJobConfirmed(jobID) {
     setError("");
     setMessage("");
     try {
       await deleteJob(jobID);
-      setMessage("Đã xóa job.");
+      setMessage("Đã xóa job thành công.");
       await loadJobs();
     } catch (err) {
       setError(err.message);
@@ -968,7 +1074,8 @@ export default function App() {
       const data = await analyzeJobCsv(jobID);
       setAnalysisResult(data || null);
       setAnalysisJobID(jobID);
-      setMessage("Da chay lai phan tich ABSA tu file CSV cua job.");
+      setActiveScreen("analysis");
+      setMessage("Đã kích hoạt mô hình ABSA phân tích file CSV thành công.");
       await loadJobs();
     } catch (err) {
       setError(err.message);
@@ -986,11 +1093,13 @@ export default function App() {
       if (data?.result) {
         setAnalysisResult(data.result);
         setAnalysisJobID(jobID);
-        setMessage("Da tai snapshot phan tich ABSA.");
+        setActiveScreen("analysis");
+        setMessage("Đã tải dữ liệu snapshot phân tích ABSA.");
       } else {
         setAnalysisResult(null);
         setAnalysisJobID(jobID);
-        setMessage(`Trang thai ABSA: ${analysisStatusText(data?.status?.status)}.`);
+        setActiveScreen("analysis");
+        setMessage(`Trạng thái ABSA: ${analysisStatusText(data?.status?.status)}.`);
       }
     } catch (err) {
       setError(err.message);
@@ -1002,14 +1111,33 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Crawler bản đồ</p>
-          <h1>Quản lý job thu thập đánh giá địa điểm</h1>
+        <div className="topbar-logo-area">
+          <p className="eyebrow">Trí Tuệ Nhân Tạo Phân Tích Review</p>
+          <h1>ABSA Review Intelligence</h1>
         </div>
-        <button type="button" className="ghost-button" onClick={loadJobs} disabled={loadingJobs}>
-          {loadingJobs ? "Đang tải" : "Làm mới"}
-        </button>
+        <div className="topbar-actions">
+          <button type="button" className="ghost-button" onClick={loadJobs} disabled={loadingJobs}>
+            {loadingJobs ? "Đang tải..." : "Làm mới dữ liệu"}
+          </button>
+        </div>
       </header>
+
+      <nav className="screen-nav" aria-label="Menu chính">
+        <button
+          type="button"
+          className={activeScreen === "analysis" ? "active" : ""}
+          onClick={() => setActiveScreen("analysis")}
+        >
+          Phân Tích & Insights
+        </button>
+        <button
+          type="button"
+          className={activeScreen === "crawler" ? "active" : ""}
+          onClick={() => setActiveScreen("crawler")}
+        >
+          Thu Thập Dữ Liệu
+        </button>
+      </nav>
 
       {(message || error) && (
         <section className="notice-area" aria-live="polite">
@@ -1018,264 +1146,330 @@ export default function App() {
         </section>
       )}
 
-      <main className="workspace-grid">
-        <section className="panel form-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Tạo job mới</p>
-              <h2>Thông tin crawl</h2>
+      {activeScreen === "analysis" ? (
+        <>
+          <SummaryMetrics
+            jobs={jobs}
+            completedJobs={completedJobs}
+            analysisReadyJobs={analysisReadyJobs}
+            workingJobs={workingJobs}
+          />
+
+          <AnalysisQueue
+            jobs={analysisJobs}
+            analyzingJobID={analyzingJobID}
+            onViewAnalysis={onViewAnalysis}
+            onAnalyze={onAnalyze}
+          />
+
+          {analysisResult ? (
+            <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />
+          ) : (
+            <section className="panel empty-analysis-workspace">
+              <div className="empty-analysis-icon-title">
+                <p className="eyebrow">Không gian phân tích</p>
+                <h2>Chọn một Snapshot ABSA ở trên để mở Dashboard</h2>
+              </div>
+              <span className="empty-analysis-description">
+                {selectedAnalysisJob
+                  ? `${selectedAnalysisJob.name}: ${analysisStatusText(selectedAnalysisJob.analysis_status)}`
+                  : "Bảng dữ liệu sẽ tự động tổng hợp phân tích điểm số khía cạnh (aspect score), điểm đau khách hàng (pain points), xếp hạng địa điểm (places ranking) và trích xuất các câu review bằng chứng thực tế từ tệp dữ liệu đã thu thập."}
+              </span>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
+          <main className="workspace-grid crawler-screen">
+            <section className="panel form-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Thu thập dữ liệu</p>
+                  <h2>Khởi tạo Job mới</h2>
+                </div>
+                <span className="keyword-count">{keywords.length} từ khóa</span>
+              </div>
+
+              <form onSubmit={onSubmit} className="form-grid">
+                <label className="field full">
+                  <span>Tên Job cào</span>
+                  <input
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                    placeholder="Ví dụ: Cà phê đặc sản Hà Nội"
+                  />
+                </label>
+
+                <label className="field full">
+                  <span>Danh sách từ khóa (Mỗi dòng 1 từ khóa)</span>
+                  <textarea
+                    rows={5}
+                    value={form.keywordsText}
+                    onChange={(e) => updateField("keywordsText", e.target.value)}
+                    placeholder={"Cà phê hồ tây\nQuán cafe đẹp hoàn kiếm"}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Ngôn ngữ</span>
+                  <input value={form.lang} onChange={(e) => updateField("lang", e.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Độ sâu cào (Depth)</span>
+                  <input
+                    type="number"
+                    value={form.depth}
+                    onChange={(e) => updateField("depth", e.target.value)}
+                    min={1}
+                  />
+                </label>
+                <label className="field">
+                  <span>Độ thu phóng (Zoom)</span>
+                  <input
+                    type="number"
+                    value={form.zoom}
+                    onChange={(e) => updateField("zoom", e.target.value)}
+                    min={0}
+                    max={21}
+                  />
+                </label>
+                <label className="field">
+                  <span>Bán kính tìm (m)</span>
+                  <input
+                    type="number"
+                    value={form.radius}
+                    onChange={(e) => updateField("radius", e.target.value)}
+                    min={1}
+                  />
+                </label>
+                <label className="field">
+                  <span>Giới hạn địa điểm</span>
+                  <input
+                    type="number"
+                    value={form.maxPlaces}
+                    onChange={(e) => updateField("maxPlaces", e.target.value)}
+                    min={0}
+                    placeholder="0 = không giới hạn"
+                  />
+                </label>
+                <label className="field">
+                  <span>Thời gian chạy tối đa (s)</span>
+                  <input
+                    type="number"
+                    value={form.maxTimeSeconds}
+                    onChange={(e) => updateField("maxTimeSeconds", e.target.value)}
+                    min={180}
+                  />
+                </label>
+                <label className="field">
+                  <span>Chế độ thu thập</span>
+                  <select value={form.crawlMode} onChange={(e) => updateField("crawlMode", e.target.value)}>
+                    <option value="full">Tải đầy đủ (Để chạy ABSA)</option>
+                    <option value="train">Chỉ tải Tiêu đề & Ngành hàng (Để huấn luyện)</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Vĩ độ (Latitude)</span>
+                  <input value={form.lat} onChange={(e) => updateField("lat", e.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Kinh độ (Longitude)</span>
+                  <input value={form.lon} onChange={(e) => updateField("lon", e.target.value)} />
+                </label>
+
+                <div className="toggles full">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={batchMode}
+                      onChange={(e) => setBatchMode(e.target.checked)}
+                    />
+                    <span>Chạy chế độ hàng loạt (Batch)</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.fastMode}
+                      onChange={(e) => updateField("fastMode", e.target.checked)}
+                    />
+                    <span>Chế độ cào nhanh (Fast)</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.urlMode}
+                      onChange={(e) => updateField("urlMode", e.target.checked)}
+                    />
+                    <span>Chỉ dùng URL nguồn</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.email}
+                      onChange={(e) => updateField("email", e.target.checked)}
+                    />
+                    <span>Tìm kiếm email</span>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={form.extraReviews}
+                      onChange={(e) => updateField("extraReviews", e.target.checked)}
+                    />
+                    <span>Thu thập thêm review</span>
+                  </label>
+                </div>
+
+                <div className="form-actions full">
+                  <button type="submit" className="primary-button" disabled={submitting}>
+                    {submitting ? "Đang gửi yêu cầu..." : "Bắt đầu thu thập"}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <PlacePicker
+              apiKey={vietMapApiKey}
+              onPick={handleMapPick}
+              selectedLocation={selectedLocation}
+            />
+          </main>
+
+          <section className="panel jobs-panel">
+            <div className="panel-heading jobs-heading">
+              <div className="jobs-heading-row">
+                <div>
+                  <p className="eyebrow">Tiến trình</p>
+                  <h2>Quản lý các Job đã khởi tạo</h2>
+                </div>
+                <span className="job-count">{filteredJobs.length} job hiển thị</span>
+              </div>
+
+              <div className="tabs" role="tablist" aria-label="Loại job">
+                <button
+                  type="button"
+                  className={`tab-button ${activeTab === "full" ? "active" : ""}`}
+                  onClick={() => setActiveTab("full")}
+                >
+                  Danh sách Job cào đầy đủ
+                </button>
+                <button
+                  type="button"
+                  className={`tab-button ${activeTab === "train" ? "active" : ""}`}
+                  onClick={() => setActiveTab("train")}
+                >
+                  Danh sách Job cào huấn luyện
+                </button>
+              </div>
             </div>
-            <span className="keyword-count">{keywords.length} từ khóa</span>
-          </div>
 
-          <form onSubmit={onSubmit} className="form-grid">
-            <label className="field full">
-              <span>Tên job</span>
-              <input
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                placeholder="Ví dụ: Cửa hàng cà phê Hà Nội"
-              />
-            </label>
-
-            <label className="field full">
-              <span>Từ khóa (mỗi dòng 1 từ khóa)</span>
-              <textarea
-                rows={5}
-                value={form.keywordsText}
-                onChange={(e) => updateField("keywordsText", e.target.value)}
-                placeholder={"cà phê hà nội\ntrà sữa quận 1"}
-              />
-            </label>
-
-            <label className="field">
-              <span>Ngôn ngữ</span>
-              <input value={form.lang} onChange={(e) => updateField("lang", e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Depth</span>
-              <input
-                type="number"
-                value={form.depth}
-                onChange={(e) => updateField("depth", e.target.value)}
-                min={1}
-              />
-            </label>
-            <label className="field">
-              <span>Zoom</span>
-              <input
-                type="number"
-                value={form.zoom}
-                onChange={(e) => updateField("zoom", e.target.value)}
-                min={0}
-                max={21}
-              />
-            </label>
-            <label className="field">
-              <span>Radius (m)</span>
-              <input
-                type="number"
-                value={form.radius}
-                onChange={(e) => updateField("radius", e.target.value)}
-                min={1}
-              />
-            </label>
-            <label className="field">
-              <span>Giới hạn địa điểm cào</span>
-              <input
-                type="number"
-                value={form.maxPlaces}
-                onChange={(e) => updateField("maxPlaces", e.target.value)}
-                min={0}
-                placeholder="0 = không giới hạn"
-              />
-            </label>
-            <label className="field">
-              <span>Max time (giây)</span>
-              <input
-                type="number"
-                value={form.maxTimeSeconds}
-                onChange={(e) => updateField("maxTimeSeconds", e.target.value)}
-                min={180}
-              />
-            </label>
-            <label className="field">
-              <span>Crawl Mode</span>
-              <select value={form.crawlMode} onChange={(e) => updateField("crawlMode", e.target.value)}>
-                <option value="full">Full (Tất cả)</option>
-                <option value="train">Train (Chỉ Title & Category)</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Latitude</span>
-              <input value={form.lat} onChange={(e) => updateField("lat", e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Longitude</span>
-              <input value={form.lon} onChange={(e) => updateField("lon", e.target.value)} />
-            </label>
-
-            <div className="toggles full">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={batchMode}
-                  onChange={(e) => setBatchMode(e.target.checked)}
-                />
-                <span>Tạo nhiều job (batch)</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.fastMode}
-                  onChange={(e) => updateField("fastMode", e.target.checked)}
-                />
-                <span>Fast mode</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.urlMode}
-                  onChange={(e) => updateField("urlMode", e.target.checked)}
-                />
-                <span>URL mode</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.email}
-                  onChange={(e) => updateField("email", e.target.checked)}
-                />
-                <span>Thu thập email</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.extraReviews}
-                  onChange={(e) => updateField("extraReviews", e.target.checked)}
-                />
-                <span>Thu thập extra reviews</span>
-              </label>
-            </div>
-
-            <div className="form-actions full">
-              <button type="submit" className="primary-button" disabled={submitting}>
-                {submitting ? "Đang tạo..." : "Tạo job"}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <PlacePicker apiKey={vietMapApiKey} onPick={handleMapPick} selectedLocation={selectedLocation} />
-      </main>
-
-      <section className="panel jobs-panel">
-        <div className="panel-heading jobs-heading">
-          <div className="jobs-heading-row">
-            <div>
-              <p className="eyebrow">Theo dõi</p>
-              <h2>Danh sách job</h2>
-            </div>
-            <span className="job-count">{filteredJobs.length} job</span>
-          </div>
-
-          <div className="tabs" role="tablist" aria-label="Chế độ crawl">
-            <button
-              type="button"
-              className={`tab-button ${activeTab === "full" ? "active" : ""}`}
-              onClick={() => setActiveTab("full")}
-            >
-              Danh sách tải full
-            </button>
-            <button
-              type="button"
-              className={`tab-button ${activeTab === "train" ? "active" : ""}`}
-              onClick={() => setActiveTab("train")}
-            >
-              Danh sách tải train
-            </button>
-          </div>
-        </div>
-
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Tên job</th>
-                <th>Trạng thái</th>
-                <th>ABSA</th>
-                <th>Thời gian tạo</th>
-                <th>Từ khóa</th>
-                <th>Giới hạn</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredJobs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="empty-cell">
-                    Chưa có job nào trong danh sách này.
-                  </td>
-                </tr>
-              ) : (
-                filteredJobs.map((job) => {
-                  const busy = analyzingJobID === job.id;
-                  const analysisStatus = job.analysis_status || "pending";
-                  const analysisReady = analysisStatus === "ok";
-                  const analysisWorking = analysisStatus === "working";
-                  const canAnalyze = job.status === "ok" && !busy && !analysisWorking;
-                  return (
-                    <tr key={job.id}>
-                      <td className="job-name">{job.name}</td>
-                      <td>
-                        <span className={`status ${job.status}`}>{statusText(job.status)}</span>
-                      </td>
-                      <td>
-                        <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
-                        {job.analysis_error && <small className="analysis-error">{job.analysis_error}</small>}
-                      </td>
-                      <td>{formatDate(job.created_at)}</td>
-                      <td className="keywords-cell">{job.keywords?.join(", ") || "-"}</td>
-                      <td>{job.max_places > 0 ? job.max_places : "Không giới hạn"}</td>
-                      <td>
-                        <div className="actions">
-                          <button type="button" onClick={() => downloadJobCsv(job.id)}>
-                            Tải CSV
-                          </button>
-                          <button
-                            type="button"
-                            className="analysis"
-                            onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
-                            disabled={job.status !== "ok" || busy || analysisWorking}
-                            title={job.status !== "ok" ? "Chỉ phân tích khi job đã hoàn tất" : ""}
-                          >
-                            {analysisButtonLabel(job, busy)}
-                          </button>
-                          {analysisReady && (
-                            <button
-                              type="button"
-                              onClick={() => onAnalyze(job.id)}
-                              disabled={!canAnalyze}
-                              title="Chay lai snapshot ABSA"
-                            >
-                              Chạy lại
-                            </button>
-                          )}
-                          <button type="button" className="danger" onClick={() => onDelete(job.id)}>
-                            Xóa
-                          </button>
-                        </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên Job</th>
+                    <th>Thu thập</th>
+                    <th>Trạng thái ABSA</th>
+                    <th>Ngày tạo</th>
+                    <th>Từ khóa</th>
+                    <th>Giới hạn địa điểm</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredJobs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="empty-cell">
+                        Chưa có job thu thập dữ liệu nào trong danh mục này.
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  ) : (
+                    filteredJobs.map((job) => {
+                      const busy = analyzingJobID === job.id;
+                      const analysisStatus = job.analysis_status || "pending";
+                      const analysisReady = analysisStatus === "ok";
+                      const analysisWorking = analysisStatus === "working";
+                      const canAnalyze = job.status === "ok" && !busy && !analysisWorking;
+                      return (
+                        <tr key={job.id}>
+                          <td className="job-name">{job.name}</td>
+                          <td>
+                            <span className={`status ${job.status}`}>{statusText(job.status)}</span>
+                          </td>
+                          <td>
+                            <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
+                            {job.analysis_error && <small className="analysis-error">{job.analysis_error}</small>}
+                          </td>
+                          <td>{formatDate(job.created_at)}</td>
+                          <td className="keywords-cell">{job.keywords?.join(", ") || "-"}</td>
+                          <td>{job.max_places > 0 ? job.max_places : "Không giới hạn"}</td>
+                          <td>
+                            <div className="actions">
+                              <button type="button" onClick={() => downloadJobCsv(job.id)} title="Tải xuống tập tin CSV">
+                                Tải CSV
+                              </button>
+                              <button
+                                type="button"
+                                className="analysis"
+                                onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
+                                disabled={job.status !== "ok" || busy || analysisWorking}
+                                title={job.status !== "ok" ? "Chỉ chạy ABSA khi job cào thành công" : "Bắt đầu chạy phân tích ABSA"}
+                              >
+                                {analysisButtonLabel(job, busy)}
+                              </button>
+                              {analysisReady && (
+                                <button
+                                  type="button"
+                                  className="re-analyze"
+                                  onClick={() => onAnalyze(job.id)}
+                                  disabled={!canAnalyze}
+                                  title="Chạy lại mô hình phân tích cho bộ dữ liệu này"
+                                >
+                                  Chạy lại
+                                </button>
+                              )}
+                              <button type="button" className="danger" onClick={() => setJobToDelete(job)} title="Xóa bỏ job này">
+                                Xóa
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
 
-      {analysisResult && <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />}
+      {jobToDelete && (
+        <div className="custom-modal-backdrop">
+          <div className="custom-modal">
+            <h3>Xác nhận xóa Job</h3>
+            <p>
+              Bạn có chắc chắn muốn xóa job <strong>{jobToDelete.name}</strong> không? Hành động này sẽ xóa vĩnh viễn dữ liệu cào được và kết quả phân tích.
+            </p>
+            <div className="custom-modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setJobToDelete(null)}>
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                onClick={async () => {
+                  const id = jobToDelete.id;
+                  setJobToDelete(null);
+                  await deleteJobConfirmed(id);
+                }}
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

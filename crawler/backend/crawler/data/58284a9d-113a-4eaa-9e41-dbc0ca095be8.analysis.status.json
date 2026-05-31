@@ -1,0 +1,6 @@
+{
+  "job_id": "58284a9d-113a-4eaa-9e41-dbc0ca095be8",
+  "status": "failed",
+  "updated_at": "2026-05-31T07:52:51Z",
+  "error": "ABSA service trả lỗi 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"query\",\"request\"],\"msg\":\"Field required\",\"input\":null}]}"
+}

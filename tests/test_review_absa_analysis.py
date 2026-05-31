@@ -6,9 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from review_absa_pipeline.aspect_metadata import enrich_aspect_row, translate_aspect
 from review_absa_pipeline.domain import DomainRoute, RuleBasedDomainRouter
 from review_absa_pipeline.engine import AnalysisEngine
 from review_absa_pipeline.insights import build_analysis_result
+from review_absa_pipeline.narrative import build_narrative_context, generate_template_narrative
 from review_absa_pipeline.pipeline import load_place_review_batches
 
 
@@ -81,6 +83,73 @@ def write_crawled_csv(path: Path) -> None:
         )
         writer.writeheader()
         writer.writerows(rows)
+
+
+class AspectMetadataTests(unittest.TestCase):
+    def test_translate_known_hotel_aspect_to_vietnamese(self) -> None:
+        metadata = translate_aspect("ROOM_AMENITIES#DESIGN&FEATURES", domain="hotel")
+
+        self.assertEqual(metadata["display_name"], "Tiện ích phòng - Thiết kế & trang bị")
+        self.assertEqual(metadata["group_name"], "Tiện ích phòng")
+        self.assertEqual(metadata["attribute_name"], "Thiết kế & trang bị")
+        self.assertEqual(metadata["domain"], "hotel")
+
+    def test_unknown_aspect_keeps_raw_key_but_normalizes_separator(self) -> None:
+        metadata = translate_aspect("UNKNOWN#MYSTERY", domain="restaurant")
+
+        self.assertEqual(metadata["display_name"], "UNKNOWN - MYSTERY")
+        self.assertEqual(metadata["group_name"], "UNKNOWN")
+        self.assertEqual(metadata["attribute_name"], "MYSTERY")
+        self.assertEqual(metadata["raw_name"], "UNKNOWN#MYSTERY")
+
+    def test_enrich_aspect_row_preserves_metrics(self) -> None:
+        row = {
+            "aspect": "SERVICE#GENERAL",
+            "mentions": 10,
+            "positive": 8,
+            "neutral": 1,
+            "negative": 1,
+            "positive_percent": 80.0,
+            "neutral_percent": 10.0,
+            "negative_percent": 10.0,
+        }
+
+        enriched = enrich_aspect_row(row, domain="hotel")
+
+        self.assertEqual(enriched["aspect"], "SERVICE#GENERAL")
+        self.assertEqual(enriched["display_name"], "Dịch vụ - Tổng quan")
+        self.assertEqual(enriched["mentions"], 10)
+        self.assertEqual(enriched["positive"], 8)
+
+
+class NarrativeTests(unittest.TestCase):
+    def test_template_narrative_uses_existing_absa_result_without_replacing_metrics(self) -> None:
+        result = {
+            "overall": {
+                "mentions": 296,
+                "positive": 290,
+                "neutral": 0,
+                "negative": 6,
+                "positive_percent": 97.97,
+                "negative_percent": 2.03,
+            },
+            "aspects": [
+                {"display_name": "Dịch vụ - Tổng quan", "mentions": 82, "positive": 82, "negative": 0, "positive_percent": 100.0, "negative_percent": 0.0},
+                {"display_name": "Tiện ích phòng - Thiết kế & trang bị", "mentions": 2, "positive": 0, "negative": 2, "positive_percent": 0.0, "negative_percent": 100.0},
+            ],
+            "alerts": [
+                {"display_name": "Tiện ích phòng - Thiết kế & trang bị", "mentions": 2, "negative": 2, "negative_percent": 100.0, "severity": "watch", "sample_note": "Mẫu nhỏ: 2 lượt đề cập"}
+            ],
+            "places": [{"title": "A25 Hotel - Đội Cấn 1", "description_count": 146}],
+        }
+
+        context = build_narrative_context(result)
+        narrative = generate_template_narrative(context)
+
+        self.assertEqual(narrative["source"], "template")
+        self.assertIn("97.97% tích cực", narrative["summary"])
+        self.assertIn("Dịch vụ - Tổng quan", narrative["strengths"][0])
+        self.assertIn("Mẫu nhỏ", narrative["caveats"][0])
 
 
 class ReviewAnalysisTests(unittest.TestCase):
@@ -167,6 +236,46 @@ class ReviewAnalysisTests(unittest.TestCase):
         self.assertEqual(result["description_count"], 1)
         self.assertEqual(result["places"][0]["domain"]["domain"], "restaurant")
         self.assertEqual(result["places"][0]["top_negative_aspects"][0]["aspect"], "SERVICE#GENERAL")
+
+    def test_analysis_result_enriches_display_metadata_and_marks_low_sample_alerts(self) -> None:
+        place_result = {
+            "input_id": "hotel-1",
+            "title": "Hotel Test",
+            "domain": {"domain": "hotel", "confidence": 0.93, "source": "fixed", "fallback": False},
+            "reviews": [
+                {
+                    "text": "Phong on nhung dich vu tot",
+                    "rating": 5,
+                    "when": "2026-01-02",
+                    "prediction": {
+                        "ROOM_AMENITIES#DESIGN&FEATURES": "negative",
+                        "SERVICE#GENERAL": "positive",
+                    },
+                },
+                {
+                    "text": "Tien ich phong chua tot",
+                    "rating": 0,
+                    "when": "2026-01-03",
+                    "prediction": {
+                        "ROOM_AMENITIES#DESIGN&FEATURES": "negative",
+                        "SERVICE#GENERAL": "positive",
+                    },
+                },
+            ],
+        }
+
+        result = build_analysis_result(
+            job_id="job-1",
+            model_repo_ids={"hotel": "repo/hotel"},
+            place_results=[place_result],
+        )
+
+        room_alert = result["alerts"][0]
+        self.assertEqual(room_alert["display_name"], "Tiện ích phòng - Thiết kế & trang bị")
+        self.assertEqual(room_alert["severity"], "watch")
+        self.assertEqual(room_alert["sample_note"], "Mẫu nhỏ: 2 lượt đề cập")
+        self.assertEqual(result["places"][0]["aspects"][0]["display_name"], "Dịch vụ - Tổng quan")
+        self.assertEqual(result["rating_vs_text"]["total_with_rating"], 1)
 
 
 if __name__ == "__main__":

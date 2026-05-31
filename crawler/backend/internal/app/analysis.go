@@ -138,6 +138,39 @@ func (s *analysisStore) SaveFailure(jobID string, cause error) error {
 	})
 }
 
+func (s *analysisStore) Narrative(jobID string) (map[string]any, error) {
+	path, err := s.narrativePath(jobID)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (s *analysisStore) SaveNarrative(jobID string, payload map[string]any) error {
+	path, err := s.narrativePath(jobID)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, raw, 0o600)
+}
+
 func (s *analysisStore) Delete(jobID string) error {
 	statusPath, err := s.statusPath(jobID)
 	if err != nil {
@@ -147,8 +180,12 @@ func (s *analysisStore) Delete(jobID string) error {
 	if err != nil {
 		return err
 	}
+	narrativePath, err := s.narrativePath(jobID)
+	if err != nil {
+		return err
+	}
 
-	for _, path := range []string{statusPath, resultPath} {
+	for _, path := range []string{statusPath, resultPath, narrativePath} {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -183,6 +220,13 @@ func (s *analysisStore) resultPath(jobID string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(s.dataFolder, jobID+".analysis.json"), nil
+}
+
+func (s *analysisStore) narrativePath(jobID string) (string, error) {
+	if err := validateSidecarJobID(jobID); err != nil {
+		return "", err
+	}
+	return filepath.Join(s.dataFolder, jobID+".analysis.narrative.json"), nil
 }
 
 func validateSidecarJobID(jobID string) error {

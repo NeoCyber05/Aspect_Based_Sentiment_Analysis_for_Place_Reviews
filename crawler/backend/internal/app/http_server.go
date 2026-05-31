@@ -46,6 +46,7 @@ func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 	handler.HandleFunc("/api/v1/jobs/{id}/download", ans.downloadCSV)
 	handler.HandleFunc("/api/v1/jobs/{id}/analysis", ans.jobAnalysis)
 	handler.HandleFunc("/api/v1/jobs/{id}/analyze", ans.analyzeCSV)
+	handler.HandleFunc("/api/v1/jobs/{id}/analysis/narrative", ans.jobAnalysisNarrative)
 
 	return ans
 }
@@ -301,6 +302,69 @@ func (s *httpServer) analyzeCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *httpServer) jobAnalysisNarrative(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	id, ok := parseJobID(r)
+	if !ok {
+		writeError(w, http.StatusUnprocessableEntity, "id không hợp lệ")
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		narrative, err := s.analysisStore.Narrative(id)
+		if err == nil {
+			writeJSON(w, http.StatusOK, narrative)
+			return
+		}
+	}
+
+	status, err := s.analysisStore.Status(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if status.Status != analysisStatusOK {
+		writeError(w, http.StatusConflict, "analysis chưa hoàn tất")
+		return
+	}
+
+	result, err := s.analysisStore.Result(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	runner, ok := s.analyzer.(narrativeRunner)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "analyzer không hỗ trợ narrative")
+		return
+	}
+
+	force := r.URL.Query().Get("force") == "1"
+	useOllama := r.URL.Query().Get("ollama") != "0"
+	if r.Method == http.MethodGet && !force {
+		if narrative, err := s.analysisStore.Narrative(id); err == nil {
+			writeJSON(w, http.StatusOK, narrative)
+			return
+		}
+	}
+
+	narrative, err := runner.generateNarrative(r.Context(), result, useOllama)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.analysisStore.SaveNarrative(id, narrative); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, narrative)
 }
 
 func parseJobID(r *http.Request) (string, bool) {

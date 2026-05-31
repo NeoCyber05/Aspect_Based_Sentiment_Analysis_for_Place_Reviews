@@ -216,6 +216,36 @@ func TestDeleteJobRemovesAnalysisSidecars(t *testing.T) {
 	}
 }
 
+func TestAnalysisStoreNarrativeLifecycle(t *testing.T) {
+	t.Parallel()
+
+	store := newAnalysisStore(t.TempDir())
+	jobID := "job-1"
+	payload := map[string]any{
+		"source":  "template",
+		"summary": "Kết quả ABSA rất tích cực.",
+	}
+
+	if err := store.SaveNarrative(jobID, payload); err != nil {
+		t.Fatalf("SaveNarrative() error = %v", err)
+	}
+
+	got, err := store.Narrative(jobID)
+	if err != nil {
+		t.Fatalf("Narrative() error = %v", err)
+	}
+	if got["summary"] != payload["summary"] {
+		t.Fatalf("summary = %v, want %v", got["summary"], payload["summary"])
+	}
+
+	if err := store.Delete(jobID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if _, err := store.Narrative(jobID); err == nil {
+		t.Fatalf("Narrative() expected error after delete")
+	}
+}
+
 func TestRunAnalysisPersistsFailureAndSuccess(t *testing.T) {
 	t.Parallel()
 

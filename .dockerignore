@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+crawler/frontend/dist/
+crawler/frontend/.vite/
+
+# Go
+crawler/backend/crawler/data/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+.codegraph/
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (large files, mounted at runtime)
+hf_absa_model/
+training/final_weight/

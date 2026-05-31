@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -33,6 +34,12 @@ func (a *reviewAnalyzer) analyzeCSV(ctx context.Context, req analysisRequest) (m
 	}
 	if req.ModelRepos == nil {
 		req.ModelRepos = a.cfg.ABSAModelRepos()
+	}
+	if !filepath.IsAbs(req.CSVPath) {
+		abs, err := filepath.Abs(req.CSVPath)
+		if err == nil {
+			req.CSVPath = abs
+		}
 	}
 
 	body, err := json.Marshal(req)

@@ -49,3 +49,14 @@ export async function analyzeJobCsv(id) {
   });
   return toJSON(response);
 }
+
+export async function generateJobNarrative(id, { force = false, ollama = true } = {}) {
+  const params = new URLSearchParams();
+  if (force) params.set("force", "1");
+  if (!ollama) params.set("ollama", "0");
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${apiBase}/api/v1/jobs/${id}/analysis/narrative${suffix}`, {
+    method: "POST"
+  });
+  return toJSON(response);
+}

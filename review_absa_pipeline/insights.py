@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
+from .aspect_metadata import enrich_aspect_row, translate_aspect
 from .pipeline import aspect_rows, summarize_aspects, summarize_overall
 
 
@@ -50,7 +51,7 @@ def _rating_mismatches(place_results: list[dict[str, Any]], limit: int = 10) -> 
     total_with_rating = 0
     for place in place_results:
         for review in place.get("reviews", []):
-            rating = review.get("rating")
+            rating = _valid_rating(review.get("rating"))
             if rating is None:
                 continue
             total_with_rating += 1
@@ -124,6 +125,35 @@ def _domain_summary(place_results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _alert_severity(mentions: int, negative: int, negative_percent: float) -> tuple[str, str]:
+    if mentions < 5:
+        return "watch", f"Mẫu nhỏ: {mentions} lượt đề cập"
+    if negative >= 3 and negative_percent >= 35.0:
+        return "high", "Ưu tiên xử lý"
+    if negative >= 2 and negative_percent >= 25.0:
+        return "medium", "Cần theo dõi"
+    return "low", "Tín hiệu nhẹ"
+
+
+def _valid_rating(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and int(value) == value and 1 <= int(value) <= 5:
+        return int(value)
+    return None
+
+
+def _dominant_domain(place_results: list[dict[str, Any]]) -> str:
+    counts: dict[str, int] = defaultdict(int)
+    for place in place_results:
+        domain = str((place.get("domain") or {}).get("domain", ""))
+        if domain:
+            counts[domain] += 1
+    if not counts:
+        return ""
+    return sorted(counts.items(), key=lambda item: item[1], reverse=True)[0][0]
+
+
 def _alerts(global_aspects: list[dict[str, Any]], limit: int = 8) -> list[dict[str, Any]]:
     candidates = [
         aspect
@@ -137,16 +167,28 @@ def _alerts(global_aspects: list[dict[str, Any]], limit: int = 8) -> list[dict[s
         ),
         reverse=True,
     )
-    return [
-        {
-            "aspect": item["aspect"],
-            "mentions": item["mentions"],
-            "negative": item["negative"],
-            "negative_percent": item["negative_percent"],
-            "priority_score": item.get("priority_score", 0.0),
-        }
-        for item in candidates[:limit]
-    ]
+    enriched_alerts: list[dict[str, Any]] = []
+    for item in candidates[:limit]:
+        mentions = int(item.get("mentions", 0) or 0)
+        negative = int(item.get("negative", 0) or 0)
+        negative_percent = float(item.get("negative_percent", 0.0) or 0.0)
+        severity, sample_note = _alert_severity(mentions, negative, negative_percent)
+        enriched_alerts.append(
+            {
+                "aspect": item["aspect"],
+                "display_name": item.get("display_name") or translate_aspect(str(item["aspect"])).get("display_name"),
+                "group_name": item.get("group_name", ""),
+                "attribute_name": item.get("attribute_name", ""),
+                "domain": item.get("domain", ""),
+                "mentions": mentions,
+                "negative": negative,
+                "negative_percent": item["negative_percent"],
+                "priority_score": item.get("priority_score", 0.0),
+                "severity": severity,
+                "sample_note": sample_note,
+            }
+        )
+    return enriched_alerts
 
 
 def build_analysis_result(
@@ -162,8 +204,9 @@ def build_analysis_result(
         predictions = [review.get("prediction") or {} for review in reviews]
         all_predictions.extend(predictions)
 
+        domain_name = str((place.get("domain") or {}).get("domain", ""))
         summary = summarize_aspects(predictions)
-        aspects = aspect_rows(summary)
+        aspects = [enrich_aspect_row(item, domain=domain_name) for item in aspect_rows(summary)]
         top_negative = [
             item
             for item in aspects
@@ -193,7 +236,8 @@ def build_analysis_result(
         )
 
     global_summary = summarize_aspects(all_predictions)
-    global_aspects = aspect_rows(global_summary)
+    global_domain = _dominant_domain(place_results)
+    global_aspects = [enrich_aspect_row(item, domain=global_domain) for item in aspect_rows(global_summary)]
     return {
         "job_id": job_id,
         "generated_at": datetime.now(timezone.utc).isoformat(),

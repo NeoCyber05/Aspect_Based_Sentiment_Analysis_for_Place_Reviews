@@ -1,0 +1,64 @@
+name: absa-review-intelligence
+
+services:
+  absa:
+    build:
+      context: .
+      dockerfile: Dockerfile.absa
+    image: absa-review/absa:latest
+    ports:
+      - "8091:8091"
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - ABSA_OLLAMA_URL=${ABSA_OLLAMA_URL:-http://host.docker.internal:11434}
+      - ABSA_OLLAMA_MODEL=${ABSA_OLLAMA_MODEL:-llama3.2:3b}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  backend:
+    build:
+      context: crawler/backend
+      dockerfile: Dockerfile
+    image: absa-review/backend:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - backend_data:/data
+    command:
+      - --addr=:8090
+      - --data-folder=/data
+      - --absa-service-url=http://absa:8091
+      - --disable-auto-analysis
+      - --concurrency=1
+      - --poll-interval=2s
+    depends_on:
+      absa:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: crawler/frontend
+      dockerfile: Dockerfile
+    image: absa-review/frontend:latest
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./crawler/frontend/src:/app/src
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8090
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_data:
+    driver: local
+  huggingface_cache:
+    driver: local

@@ -1,105 +1,60 @@
-# Aspect-Based Sentiment Analysis for Place Reviews
+# ABSA Review Intelligence
 
-<p>
-  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
-  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
-  <img src="https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" />
-</p>
+Aspect-Based Sentiment Analysis for place reviews — crawl, analyze, visualize.
 
-This project provides a full workflow for collecting place reviews and preparing data that can be used for aspect-based sentiment analysis.  
-It includes a Go backend that manages crawl jobs and CSV exports, and a React frontend that lets you create, monitor, and download jobs from a web UI.
+**Stack:** Go + FastAPI + React + Vite + SQLite + PyTorch
 
-## What This Project Does
-
-- Creates crawl jobs for place-related keywords.
-- Processes jobs in the background with a worker loop.
-- Stores job metadata in SQLite.
-- Exports crawl results to CSV per job.
-- Provides a browser UI for managing jobs and selecting locations on a map.
-
-
-
-## Quick Start
-
-### 1) Clone and enter the project
+## Quick Start (Docker)
 
 ```bash
-git clone <your-repo-url>
-cd Aspect_Based_Sentiment_Analysis_for_Place_Reviews
+docker compose up -d
 ```
 
-### 2) Configure frontend environment
+Open http://localhost:5173
 
-Create `crawler/frontend/.env.local`:
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Go API | http://localhost:8090/api/health |
+| Python ABSA | http://localhost:8091/health |
 
-```env
-VITE_VIETMAP_API_KEY=your_vietmap_api_key
-# Optional (default is http://localhost:8090)
-VITE_API_BASE_URL=http://localhost:8090
-```
+## Manual Dev Start
 
-### 3) Run development services
-
-From the `crawler` directory:
-
-- **Windows (PowerShell)**
-  ```powershell
-  ./scripts/dev.ps1
-  ```
-
-- **Linux/macOS (Bash)**
-  ```bash
-  ./scripts/dev.sh
-  ```
-
-This starts:
-- Backend at `http://localhost:8090`
-- Frontend at `http://localhost:5173`
-
-
-
-### Backend
+Three terminals:
 
 ```bash
-cd crawler/backend
-go run ./cmd/server
+# Terminal 1 - ABSA service
+python -m review_absa_pipeline.service
+
+# Terminal 2 - Go backend
+cd crawler/backend && go run ./cmd/server -absa-service-url http://127.0.0.1:8091
+
+# Terminal 3 - React frontend
+cd crawler/frontend && npm install && npm run dev
 ```
 
-### Frontend
+Configure `crawler/frontend/.env.local` with `VITE_VIETMAP_API_KEY` for map features.
+
+## Load Models
 
 ```bash
-cd crawler/frontend
-npm install
-npm run dev
-```
-
-## Load Published Weights
-
-The published Hugging Face models can be loaded directly after cloning this repo.
-
-Install the Python dependencies you need for inference:
-
-```bash
-pip install torch transformers safetensors sentencepiece huggingface_hub
-```
-
-Run a quick load test:
-
-```bash
+pip install -r requirements.txt
 python load_hf_model.py --repo-id NeoCyber/m-e5-small-vlsp2018-hotel --text "Phòng sạch sẽ, nhân viên thân thiện"
 ```
 
-Available model repos:
+## Run Tests
 
-- `NeoCyber/m-e5-small-hosrev`
-- `NeoCyber/m-e5-small-uit-vsfc-uni`
-- `NeoCyber/m-e5-small-vlsp2018-hotel`
-- `NeoCyber/m-e5-small-vlsp2018-restaurant`
+```bash
+# Python
+python -m unittest tests.test_review_absa_analysis -v
 
-Notes:
+# Go
+cd crawler/backend && go test ./internal/app -v
 
-- Keep `hf_absa_model/` in the repo if you want to preserve the local source of the custom architectures.
-- `push_hf_ready_models.py` is only for uploading exported folders to Hugging Face. It is not needed for inference.
+# Frontend build
+cd crawler/frontend && npm run build
+```
 
+## Optional: Ollama Narrative
+
+Set `ABSA_OLLAMA_URL` / `ABSA_OLLAMA_MODEL` env vars to enable AI-generated Vietnamese narratives alongside ABSA metrics.
