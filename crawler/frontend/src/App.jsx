@@ -1,7 +1,7 @@
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobs } from "./api";
+import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobAnalysis, fetchJobs } from "./api";
 
 const vietMapApiKey = import.meta.env.VITE_VIETMAP_API_KEY?.trim() || "";
 const vietMapApiBase = "https://maps.vietmap.vn/api";
@@ -91,6 +91,13 @@ const statusLabels = {
   failed: "Thất bại"
 };
 
+const analysisStatusLabels = {
+  pending: "Chua phan tich",
+  working: "Dang phan tich",
+  ok: "Da phan tich",
+  failed: "Loi phan tich"
+};
+
 function formatDate(isoString) {
   const date = new Date(isoString);
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("vi-VN");
@@ -98,6 +105,10 @@ function formatDate(isoString) {
 
 function statusText(status) {
   return statusLabels[status] || status;
+}
+
+function analysisStatusText(status) {
+  return analysisStatusLabels[status] || status || "Chua phan tich";
 }
 
 function prettifyAspectName(raw) {
@@ -117,8 +128,31 @@ function scoreText(value) {
   return `${Number(value || 0).toFixed(1)}/5`;
 }
 
+function percentText(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
 function visibleAspects(aspects) {
   return (Array.isArray(aspects) ? aspects : []).filter((item) => Number(item.mentions || 0) > 0);
+}
+
+function domainSummaryRows(summary) {
+  const domains = summary?.domains || {};
+  return Object.entries(domains).map(([domain, metrics]) => ({ domain, ...metrics }));
+}
+
+function analysisButtonLabel(job, busy) {
+  if (busy) return "Dang tai...";
+  switch (job.analysis_status) {
+    case "ok":
+      return "Xem phan tich";
+    case "failed":
+      return "Chay lai";
+    case "working":
+      return "Dang phan tich";
+    default:
+      return "Chay phan tich";
+  }
 }
 
 function formatCoordinate(value) {
@@ -233,15 +267,195 @@ function PlaceAnalysis({ places }) {
             <div className="place-analysis-heading">
               <div>
                 <strong>{place.title || `Địa điểm ${index + 1}`}</strong>
-                <span>{place.description_count || 0} review có nội dung</span>
+                <span>
+                  {place.description_count || 0} review có nội dung
+                  {place.domain?.domain ? ` · ${place.domain.domain}` : ""}
+                </span>
               </div>
               <span className="place-score">{scoreText(overall.score_5)}</span>
             </div>
+            {Array.isArray(place.top_negative_aspects) && place.top_negative_aspects.length > 0 && (
+              <div className="mini-insight-list">
+                {place.top_negative_aspects.slice(0, 3).map((item) => (
+                  <span key={item.aspect}>{prettifyAspectName(item.aspect)}: {percentText(item.negative_percent)} negative</span>
+                ))}
+              </div>
+            )}
             <AspectRows aspects={aspects} limit={5} />
+            {Array.isArray(place.evidence) && place.evidence.length > 0 && (
+              <div className="evidence-list compact">
+                {place.evidence.slice(0, 2).map((item, evidenceIndex) => (
+                  <blockquote key={`${place.input_id || index}-${evidenceIndex}`}>
+                    <p>{item.text}</p>
+                    <footer>
+                      {item.rating ? `${item.rating} sao` : "Khong co rating"}
+                      {item.negative_aspects?.length ? ` · ${item.negative_aspects.map(prettifyAspectName).join(", ")}` : ""}
+                    </footer>
+                  </blockquote>
+                ))}
+              </div>
+            )}
           </article>
         );
       })}
     </div>
+  );
+}
+
+function InsightCards({ result }) {
+  const overall = result?.overall || {};
+  const ratingVsText = result?.rating_vs_text || {};
+  return (
+    <div className="insight-grid">
+      <article>
+        <span>Diem tong quan</span>
+        <strong>{scoreText(overall.score_5)}</strong>
+        <small>{overall.mentions || 0} luot aspect duoc nhan dien</small>
+      </article>
+      <article>
+        <span>Ty le negative</span>
+        <strong>{percentText(overall.negative_percent)}</strong>
+        <small>{overall.negative || 0} negative mentions</small>
+      </article>
+      <article>
+        <span>Dia diem</span>
+        <strong>{result?.place_count || 0}</strong>
+        <small>{result?.description_count || 0} review co noi dung</small>
+      </article>
+      <article>
+        <span>Lech sao/noi dung</span>
+        <strong>{ratingVsText.mismatch_count || 0}</strong>
+        <small>{ratingVsText.total_with_rating || 0} review co rating</small>
+      </article>
+    </div>
+  );
+}
+
+function AlertsList({ alerts }) {
+  const rows = Array.isArray(alerts) ? alerts : [];
+  if (rows.length === 0) {
+    return <p className="empty-analysis">Chua co canh bao negative noi bat.</p>;
+  }
+  return (
+    <div className="alert-list">
+      {rows.slice(0, 6).map((item) => (
+        <article key={item.aspect}>
+          <strong>{prettifyAspectName(item.aspect)}</strong>
+          <span>{item.negative || 0}/{item.mentions || 0} negative · {percentText(item.negative_percent)}</span>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function DomainSummary({ summary }) {
+  const rows = domainSummaryRows(summary);
+  const lowConfidence = Array.isArray(summary?.low_confidence) ? summary.low_confidence : [];
+  if (rows.length === 0) return null;
+  return (
+    <div className="domain-summary">
+      <div className="domain-grid">
+        {rows.map((item) => (
+          <article key={item.domain}>
+            <strong>{item.domain}</strong>
+            <span>{item.place_count || 0} dia diem · {item.review_count || 0} reviews</span>
+            <small>confidence {Number(item.avg_confidence || 0).toFixed(2)}</small>
+          </article>
+        ))}
+      </div>
+      {lowConfidence.length > 0 && (
+        <div className="low-confidence">
+          <strong>Can kiem tra domain routing</strong>
+          {lowConfidence.slice(0, 5).map((item) => (
+            <span key={`${item.input_id}-${item.domain}`}>
+              {item.title || item.input_id}: {item.domain} ({Number(item.confidence || 0).toFixed(2)})
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RatingMismatch({ data }) {
+  const examples = Array.isArray(data?.examples) ? data.examples : [];
+  if (examples.length === 0) return null;
+  return (
+    <div className="evidence-list">
+      {examples.slice(0, 4).map((item, index) => (
+        <blockquote key={`${item.input_id}-${index}`}>
+          <p>{item.text}</p>
+          <footer>
+            {item.title || item.input_id} · {item.rating} sao
+            {item.negative_aspects?.length ? ` · negative: ${item.negative_aspects.map(prettifyAspectName).join(", ")}` : ""}
+          </footer>
+        </blockquote>
+      ))}
+    </div>
+  );
+}
+
+function AnalysisDashboard({ result, jobID }) {
+  return (
+    <section className="panel analysis-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">ABSA tong hop</p>
+          <h2>Ket qua phan tich review</h2>
+        </div>
+        <span className="job-count">Job: {jobID}</span>
+      </div>
+
+      <div className="analysis-meta">
+        <span>{result.place_count || 0} dia diem</span>
+        <span>{result.description_count || 0} review hop le</span>
+        <span>{result.generated_at ? `Cap nhat ${formatDate(result.generated_at)}` : "Snapshot moi nhat"}</span>
+      </div>
+
+      <InsightCards result={result} />
+
+      <div className="analysis-columns">
+        <section>
+          <div className="section-heading">
+            <h3>Van de can uu tien</h3>
+            <span>{result.alerts?.length || 0} canh bao</span>
+          </div>
+          <AlertsList alerts={result.alerts} />
+        </section>
+
+        <section>
+          <div className="section-heading">
+            <h3>Domain routing</h3>
+            <span>{domainSummaryRows(result.domain_summary).length} domain</span>
+          </div>
+          <DomainSummary summary={result.domain_summary} />
+        </section>
+      </div>
+
+      <div className="place-analysis-section">
+        <div className="section-heading">
+          <h3>Aspect tong hop</h3>
+          <span>{visibleAspects(result.aspects).length} aspect</span>
+        </div>
+        <AspectRows aspects={visibleAspects(result.aspects)} />
+      </div>
+
+      <div className="place-analysis-section">
+        <div className="section-heading">
+          <h3>Lech giua sao va noi dung</h3>
+          <span>{result.rating_vs_text?.mismatch_count || 0} review</span>
+        </div>
+        <RatingMismatch data={result.rating_vs_text} />
+      </div>
+
+      <div className="place-analysis-section">
+        <div className="section-heading">
+          <h3>Trung binh theo dia diem</h3>
+          <span>{result.places?.length || 0} dia diem</span>
+        </div>
+        <PlaceAnalysis places={result.places} />
+      </div>
+    </section>
   );
 }
 
@@ -754,7 +968,30 @@ export default function App() {
       const data = await analyzeJobCsv(jobID);
       setAnalysisResult(data || null);
       setAnalysisJobID(jobID);
-      setMessage("Đã phân tích ABSA từ file CSV của job.");
+      setMessage("Da chay lai phan tich ABSA tu file CSV cua job.");
+      await loadJobs();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalyzingJobID("");
+    }
+  }
+
+  async function onViewAnalysis(jobID) {
+    setError("");
+    setMessage("");
+    setAnalyzingJobID(jobID);
+    try {
+      const data = await fetchJobAnalysis(jobID);
+      if (data?.result) {
+        setAnalysisResult(data.result);
+        setAnalysisJobID(jobID);
+        setMessage("Da tai snapshot phan tich ABSA.");
+      } else {
+        setAnalysisResult(null);
+        setAnalysisJobID(jobID);
+        setMessage(`Trang thai ABSA: ${analysisStatusText(data?.status?.status)}.`);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -966,6 +1203,7 @@ export default function App() {
               <tr>
                 <th>Tên job</th>
                 <th>Trạng thái</th>
+                <th>ABSA</th>
                 <th>Thời gian tạo</th>
                 <th>Từ khóa</th>
                 <th>Giới hạn</th>
@@ -975,96 +1213,69 @@ export default function App() {
             <tbody>
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty-cell">
+                  <td colSpan={7} className="empty-cell">
                     Chưa có job nào trong danh sách này.
                   </td>
                 </tr>
               ) : (
-                filteredJobs.map((job) => (
-                  <tr key={job.id}>
-                    <td className="job-name">{job.name}</td>
-                    <td>
-                      <span className={`status ${job.status}`}>{statusText(job.status)}</span>
-                    </td>
-                    <td>{formatDate(job.created_at)}</td>
-                    <td className="keywords-cell">{job.keywords?.join(", ") || "-"}</td>
-                    <td>{job.max_places > 0 ? job.max_places : "Không giới hạn"}</td>
-                    <td>
-                      <div className="actions">
-                        <button type="button" onClick={() => downloadJobCsv(job.id)}>
-                          Tải CSV
-                        </button>
-                        <button
-                          type="button"
-                          className="analysis"
-                          onClick={() => onAnalyze(job.id)}
-                          disabled={job.status !== "ok" || analyzingJobID === job.id}
-                          title={job.status !== "ok" ? "Chỉ phân tích khi job đã hoàn tất" : ""}
-                        >
-                          {analyzingJobID === job.id ? "Đang phân tích..." : "Phân tích"}
-                        </button>
-                        <button type="button" className="danger" onClick={() => onDelete(job.id)}>
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredJobs.map((job) => {
+                  const busy = analyzingJobID === job.id;
+                  const analysisStatus = job.analysis_status || "pending";
+                  const analysisReady = analysisStatus === "ok";
+                  const analysisWorking = analysisStatus === "working";
+                  const canAnalyze = job.status === "ok" && !busy && !analysisWorking;
+                  return (
+                    <tr key={job.id}>
+                      <td className="job-name">{job.name}</td>
+                      <td>
+                        <span className={`status ${job.status}`}>{statusText(job.status)}</span>
+                      </td>
+                      <td>
+                        <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
+                        {job.analysis_error && <small className="analysis-error">{job.analysis_error}</small>}
+                      </td>
+                      <td>{formatDate(job.created_at)}</td>
+                      <td className="keywords-cell">{job.keywords?.join(", ") || "-"}</td>
+                      <td>{job.max_places > 0 ? job.max_places : "Không giới hạn"}</td>
+                      <td>
+                        <div className="actions">
+                          <button type="button" onClick={() => downloadJobCsv(job.id)}>
+                            Tải CSV
+                          </button>
+                          <button
+                            type="button"
+                            className="analysis"
+                            onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
+                            disabled={job.status !== "ok" || busy || analysisWorking}
+                            title={job.status !== "ok" ? "Chỉ phân tích khi job đã hoàn tất" : ""}
+                          >
+                            {analysisButtonLabel(job, busy)}
+                          </button>
+                          {analysisReady && (
+                            <button
+                              type="button"
+                              onClick={() => onAnalyze(job.id)}
+                              disabled={!canAnalyze}
+                              title="Chay lai snapshot ABSA"
+                            >
+                              Chạy lại
+                            </button>
+                          )}
+                          <button type="button" className="danger" onClick={() => onDelete(job.id)}>
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
 
-      {analysisResult && (
-        <section className="panel analysis-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">ABSA tổng hợp</p>
-              <h2>Kết quả phân tích từ file CSV</h2>
-            </div>
-            <span className="job-count">Job: {analysisJobID}</span>
-          </div>
-
-          <div className="analysis-meta">
-            <span>{analysisResult.place_count || 0} địa điểm</span>
-            <span>{analysisResult.description_count || 0} description hợp lệ</span>
-          </div>
-
-          <div className="aspect-list">
-            {visibleAspects(analysisResult.aspects).map((item) => {
-              const scorePercent = clampPercent(item.score_percent);
-              const negative = Number(item.negative_percent || 0);
-              return (
-                <article className="aspect-row" key={item.aspect}>
-                  <div className="aspect-label">
-                    <strong>{prettifyAspectName(item.aspect)}</strong>
-                    <small>{item.mentions || 0} lượt đề cập</small>
-                  </div>
-                  <div className="aspect-meter-wrap">
-                    <div className="aspect-meter">
-                      <div className="aspect-meter-track" />
-                      <div
-                        className={`aspect-meter-fill ${negative >= 45 ? "negative" : "positive"}`}
-                        style={{ width: `${scorePercent}%` }}
-                      />
-                    </div>
-                    <span className="aspect-score">{scoreText(item.score_5)}</span>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          <div className="place-analysis-section">
-            <div className="section-heading">
-              <h3>Trung bình theo địa điểm</h3>
-              <span>{analysisResult.places?.length || 0} địa điểm</span>
-            </div>
-            <PlaceAnalysis places={analysisResult.places} />
-          </div>
-        </section>
-      )}
+      {analysisResult && <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />}
     </div>
   );
 }

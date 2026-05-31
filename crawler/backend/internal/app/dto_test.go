@@ -59,7 +59,7 @@ func TestToJobResponse(t *testing.T) {
 		},
 	}
 
-	resp := toJobResponse(job)
+	resp := toJobResponse(job, analysisStatusSnapshot{Status: analysisStatusPending})
 	if resp.ID != job.ID {
 		t.Fatalf("expected id %s, got %s", job.ID, resp.ID)
 	}

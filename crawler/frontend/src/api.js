@@ -38,6 +38,11 @@ export function downloadJobCsv(id) {
   window.open(`${apiBase}/api/v1/jobs/${id}/download`, "_blank", "noopener,noreferrer");
 }
 
+export async function fetchJobAnalysis(id) {
+  const response = await fetch(`${apiBase}/api/v1/jobs/${id}/analysis`);
+  return toJSON(response);
+}
+
 export async function analyzeJobCsv(id) {
   const response = await fetch(`${apiBase}/api/v1/jobs/${id}/analyze`, {
     method: "POST"

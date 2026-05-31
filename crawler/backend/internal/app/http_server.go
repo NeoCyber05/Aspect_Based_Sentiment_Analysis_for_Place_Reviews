@@ -17,16 +17,19 @@ import (
 )
 
 type httpServer struct {
-	svc      *web.Service
-	srv      *http.Server
-	analyzer *reviewAnalyzer
+	svc           *web.Service
+	srv           *http.Server
+	analyzer      analysisRunner
+	analysisStore *analysisStore
 }
 
 func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 	handler := http.NewServeMux()
+	store := newAnalysisStore(cfg.DataFolder)
 	ans := &httpServer{
-		svc:      svc,
-		analyzer: newReviewAnalyzer(cfg),
+		svc:           svc,
+		analyzer:      newReviewAnalyzer(cfg),
+		analysisStore: store,
 		srv: &http.Server{
 			Addr:              cfg.Addr,
 			Handler:           withCORS(handler),
@@ -41,6 +44,7 @@ func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 	handler.HandleFunc("/api/v1/jobs", ans.jobs)
 	handler.HandleFunc("/api/v1/jobs/{id}", ans.jobByID)
 	handler.HandleFunc("/api/v1/jobs/{id}/download", ans.downloadCSV)
+	handler.HandleFunc("/api/v1/jobs/{id}/analysis", ans.jobAnalysis)
 	handler.HandleFunc("/api/v1/jobs/{id}/analyze", ans.analyzeCSV)
 
 	return ans
@@ -133,7 +137,12 @@ func (s *httpServer) listJobs(w http.ResponseWriter, r *http.Request) {
 
 	ans := make([]jobResponse, 0, len(jobs))
 	for _, item := range jobs {
-		ans = append(ans, toJobResponse(item))
+		status, err := s.analysisStore.Status(item.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		ans = append(ans, toJobResponse(item, status))
 	}
 
 	writeJSON(w, http.StatusOK, ans)
@@ -154,9 +163,18 @@ func (s *httpServer) jobByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, toJobResponse(job))
+		status, err := s.analysisStore.Status(job.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, toJobResponse(job, status))
 	case http.MethodDelete:
 		if err := s.svc.Delete(r.Context(), id); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := s.analysisStore.Delete(id); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -207,6 +225,36 @@ func (s *httpServer) downloadCSV(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, file)
 }
 
+func (s *httpServer) jobAnalysis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	id, ok := parseJobID(r)
+	if !ok {
+		writeError(w, http.StatusUnprocessableEntity, "id không hợp lệ")
+		return
+	}
+
+	status, err := s.analysisStore.Status(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := analysisResponse{Status: status}
+	if status.Status == analysisStatusOK {
+		result, err := s.analysisStore.Result(id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		response.Result = result
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (s *httpServer) analyzeCSV(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -215,7 +263,7 @@ func (s *httpServer) analyzeCSV(w http.ResponseWriter, r *http.Request) {
 
 	id, ok := parseJobID(r)
 	if !ok {
-		writeError(w, http.StatusUnprocessableEntity, "id không hợp lệ")
+		writeError(w, http.StatusUnprocessableEntity, "id khÃ´ng há»£p lá»‡")
 		return
 	}
 
@@ -232,9 +280,23 @@ func (s *httpServer) analyzeCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload, err := s.analyzer.analyzeCSV(r.Context(), filePath)
+	if err := s.analysisStore.MarkWorking(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	payload, err := s.analyzer.analyzeCSV(r.Context(), analysisRequest{
+		JobID:   id,
+		CSVPath: filePath,
+		Force:   true,
+	})
 	if err != nil {
+		_ = s.analysisStore.SaveFailure(id, err)
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.analysisStore.SaveSuccess(id, payload); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

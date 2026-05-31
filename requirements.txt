@@ -1,0 +1,7 @@
+torch
+transformers
+safetensors
+sentencepiece
+huggingface_hub
+fastapi
+uvicorn

@@ -21,14 +21,18 @@ import (
 )
 
 type worker struct {
-	svc *web.Service
-	cfg *Config
+	svc           *web.Service
+	cfg           *Config
+	analyzer      analysisRunner
+	analysisStore *analysisStore
 }
 
 func newWorker(svc *web.Service, cfg *Config) *worker {
 	return &worker{
-		svc: svc,
-		cfg: cfg,
+		svc:           svc,
+		cfg:           cfg,
+		analyzer:      newReviewAnalyzer(cfg),
+		analysisStore: newAnalysisStore(cfg.DataFolder),
 	}
 }
 
@@ -155,7 +159,50 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 	}
 
 	job.Status = web.StatusOK
-	return w.svc.Update(ctx, job)
+	if err := w.svc.Update(ctx, job); err != nil {
+		return err
+	}
+	w.enqueueAnalysis(job.ID, outpath)
+	return nil
+}
+
+func (w *worker) enqueueAnalysis(jobID, csvPath string) {
+	if w == nil || w.cfg == nil || !w.cfg.AutoAnalyze || w.analyzer == nil || w.analysisStore == nil {
+		return
+	}
+	status, err := w.analysisStore.Status(jobID)
+	if err != nil {
+		log.Printf("không đọc được trạng thái phân tích id=%s err=%v", jobID, err)
+		return
+	}
+	if status.Status == analysisStatusOK || status.Status == analysisStatusWorking {
+		return
+	}
+	go w.runAnalysis(context.Background(), analysisRequest{
+		JobID:   jobID,
+		CSVPath: csvPath,
+		Force:   false,
+	})
+}
+
+func (w *worker) runAnalysis(ctx context.Context, req analysisRequest) {
+	if w == nil || w.analyzer == nil || w.analysisStore == nil {
+		return
+	}
+	if err := w.analysisStore.MarkWorking(req.JobID); err != nil {
+		log.Printf("không cập nhật được trạng thái phân tích id=%s err=%v", req.JobID, err)
+		return
+	}
+	payload, err := w.analyzer.analyzeCSV(ctx, req)
+	if err != nil {
+		if saveErr := w.analysisStore.SaveFailure(req.JobID, err); saveErr != nil {
+			log.Printf("không lưu được lỗi phân tích id=%s err=%v", req.JobID, saveErr)
+		}
+		return
+	}
+	if err := w.analysisStore.SaveSuccess(req.JobID, payload); err != nil {
+		log.Printf("không lưu được kết quả phân tích id=%s err=%v", req.JobID, err)
+	}
 }
 
 func (w *worker) failJob(ctx context.Context, job *web.Job, err error) error {

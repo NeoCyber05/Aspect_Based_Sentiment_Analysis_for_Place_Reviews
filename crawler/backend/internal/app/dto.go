@@ -39,25 +39,28 @@ type apiError struct {
 }
 
 type jobResponse struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	CreatedAt      string   `json:"created_at"`
-	Status         string   `json:"status"`
-	Keywords       []string `json:"keywords"`
-	URLMode        bool     `json:"url_mode"`
-	Lang           string   `json:"lang"`
-	Zoom           int      `json:"zoom"`
-	Lat            string   `json:"lat"`
-	Lon            string   `json:"lon"`
-	FastMode       bool     `json:"fast_mode"`
-	Radius         int      `json:"radius"`
-	Depth          int      `json:"depth"`
-	MaxPlaces      int      `json:"max_places"`
-	Email          bool     `json:"email"`
-	ExtraReviews   bool     `json:"extra_reviews"`
-	MaxTimeSeconds int      `json:"max_time_seconds"`
-	Proxies        []string `json:"proxies"`
-	CrawlMode      string   `json:"crawl_mode"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	CreatedAt         string   `json:"created_at"`
+	Status            string   `json:"status"`
+	AnalysisStatus    string   `json:"analysis_status"`
+	AnalysisUpdatedAt string   `json:"analysis_updated_at,omitempty"`
+	AnalysisError     string   `json:"analysis_error,omitempty"`
+	Keywords          []string `json:"keywords"`
+	URLMode           bool     `json:"url_mode"`
+	Lang              string   `json:"lang"`
+	Zoom              int      `json:"zoom"`
+	Lat               string   `json:"lat"`
+	Lon               string   `json:"lon"`
+	FastMode          bool     `json:"fast_mode"`
+	Radius            int      `json:"radius"`
+	Depth             int      `json:"depth"`
+	MaxPlaces         int      `json:"max_places"`
+	Email             bool     `json:"email"`
+	ExtraReviews      bool     `json:"extra_reviews"`
+	MaxTimeSeconds    int      `json:"max_time_seconds"`
+	Proxies           []string `json:"proxies"`
+	CrawlMode         string   `json:"crawl_mode"`
 }
 
 func (r *createJobRequest) normalize() {
@@ -150,26 +153,32 @@ func (r *createJobRequest) toWebJob() web.Job {
 	}
 }
 
-func toJobResponse(job web.Job) jobResponse {
+func toJobResponse(job web.Job, analysisStatus analysisStatusSnapshot) jobResponse {
+	if analysisStatus.Status == "" {
+		analysisStatus.Status = analysisStatusPending
+	}
 	return jobResponse{
-		ID:             job.ID,
-		Name:           job.Name,
-		CreatedAt:      job.Date.UTC().Format(time.RFC3339),
-		Status:         job.Status,
-		Keywords:       job.Data.Keywords,
-		URLMode:        job.Data.URLMode,
-		Lang:           job.Data.Lang,
-		Zoom:           job.Data.Zoom,
-		Lat:            job.Data.Lat,
-		Lon:            job.Data.Lon,
-		FastMode:       job.Data.FastMode,
-		Radius:         job.Data.Radius,
-		Depth:          job.Data.Depth,
-		MaxPlaces:      job.Data.MaxPlaces,
-		Email:          job.Data.Email,
-		ExtraReviews:   job.Data.ExtraReviews,
-		MaxTimeSeconds: int(job.Data.MaxTime.Seconds()),
-		Proxies:        job.Data.Proxies,
-		CrawlMode:      job.Data.CrawlMode,
+		ID:                job.ID,
+		Name:              job.Name,
+		CreatedAt:         job.Date.UTC().Format(time.RFC3339),
+		Status:            job.Status,
+		AnalysisStatus:    analysisStatus.Status,
+		AnalysisUpdatedAt: analysisStatus.UpdatedAt,
+		AnalysisError:     analysisStatus.Error,
+		Keywords:          job.Data.Keywords,
+		URLMode:           job.Data.URLMode,
+		Lang:              job.Data.Lang,
+		Zoom:              job.Data.Zoom,
+		Lat:               job.Data.Lat,
+		Lon:               job.Data.Lon,
+		FastMode:          job.Data.FastMode,
+		Radius:            job.Data.Radius,
+		Depth:             job.Data.Depth,
+		MaxPlaces:         job.Data.MaxPlaces,
+		Email:             job.Data.Email,
+		ExtraReviews:      job.Data.ExtraReviews,
+		MaxTimeSeconds:    int(job.Data.MaxTime.Seconds()),
+		Proxies:           job.Data.Proxies,
+		CrawlMode:         job.Data.CrawlMode,
 	}
 }

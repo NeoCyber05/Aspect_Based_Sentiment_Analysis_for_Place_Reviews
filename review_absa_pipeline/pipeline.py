@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -12,11 +12,23 @@ DESCRIPTION_KEYS = ("Description", "description", "Text", "text", "Review", "rev
 
 
 @dataclass
+class ReviewRecord:
+    text: str
+    rating: int | None = None
+    when: str = ""
+    reviewer_name: str = ""
+    source_column: str = ""
+
+
+@dataclass
 class PlaceReviewBatch:
     input_id: str
     title: str
     source_column: str
     descriptions: list[str]
+    category: str = ""
+    address: str = ""
+    reviews: list[ReviewRecord] = field(default_factory=list)
 
 
 def _normalize_description(value: Any) -> str | None:
@@ -34,6 +46,43 @@ def _description_from_review(review: dict[str, Any]) -> str | None:
         if description:
             return description
     return None
+
+
+def _rating_from_review(review: dict[str, Any]) -> int | None:
+    raw_rating = review.get("Rating", review.get("rating"))
+    if raw_rating is None or raw_rating == "":
+        return None
+    try:
+        return int(float(str(raw_rating).strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def _text_from_review(record: ReviewRecord | dict[str, Any] | str) -> str:
+    if isinstance(record, ReviewRecord):
+        return record.text
+    if isinstance(record, dict):
+        return _description_from_review(record) or ""
+    return _normalize_description(record) or ""
+
+
+def _review_record_from_item(item: Any, source_column: str) -> ReviewRecord | None:
+    if isinstance(item, dict):
+        description = _description_from_review(item)
+        if not description:
+            return None
+        return ReviewRecord(
+            text=description,
+            rating=_rating_from_review(item),
+            when=str(item.get("When") or item.get("when") or "").strip(),
+            reviewer_name=str(item.get("Name") or item.get("name") or "").strip(),
+            source_column=source_column,
+        )
+
+    description = _normalize_description(item)
+    if not description:
+        return None
+    return ReviewRecord(text=description, source_column=source_column)
 
 
 def _descriptions_from_column(raw_value: Any) -> list[str]:
@@ -69,27 +118,58 @@ def _descriptions_from_column(raw_value: Any) -> list[str]:
     return descriptions
 
 
+def _review_records_from_column(raw_value: Any, source_column: str) -> list[ReviewRecord]:
+    if raw_value is None:
+        return []
+    text = str(raw_value).strip()
+    if not text or text.lower() == "null":
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        record = _review_record_from_item(text, source_column)
+        return [record] if record else []
+
+    if isinstance(parsed, (str, dict)):
+        record = _review_record_from_item(parsed, source_column)
+        return [record] if record else []
+
+    if not isinstance(parsed, list):
+        return []
+
+    records: list[ReviewRecord] = []
+    for item in parsed:
+        record = _review_record_from_item(item, source_column)
+        if record:
+            records.append(record)
+    return records
+
+
 def load_place_review_batches(csv_path: str | Path) -> list[PlaceReviewBatch]:
     csv_path = Path(csv_path)
     results: list[PlaceReviewBatch] = []
     with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
         for row in reader:
-            descriptions: list[str] = []
+            reviews: list[ReviewRecord] = []
             source_column = ""
             for column in REVIEW_COLUMNS:
-                descriptions = _descriptions_from_column(row.get(column, ""))
-                if descriptions:
+                reviews = _review_records_from_column(row.get(column, ""), column)
+                if reviews:
                     source_column = column
                     break
-            if not descriptions:
+            if not reviews:
                 continue
+            descriptions = [_text_from_review(review) for review in reviews]
             results.append(
                 PlaceReviewBatch(
                     input_id=str(row.get("input_id", "")).strip(),
                     title=str(row.get("title") or row.get("name") or "").strip(),
                     source_column=source_column,
                     descriptions=descriptions,
+                    category=str(row.get("category", "")).strip(),
+                    address=str(row.get("address", "")).strip(),
+                    reviews=reviews,
                 )
             )
     return results
@@ -130,6 +210,8 @@ def summarize_aspects(predictions: list[dict[str, str | None]]) -> dict[str, dic
             "negative_percent": round(negative_percent, 2),
             "score_5": round(score_5, 2),
             "score_percent": round(score_5 * 20.0, 2),
+            "negative_rate": round(negative_percent, 2),
+            "priority_score": round(neg * max(1.0, negative_percent), 2),
         }
     return summary
 
