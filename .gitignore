@@ -7,3 +7,9 @@ __pycache__/
 training/final_weight/
 crawler/backend/crawler/data/*.db-shm
 crawler/backend/crawler/data/*.db-wal
+
+# Local dev tooling
+.agents/
+.codegraph/
+.cursor/
+docs/
