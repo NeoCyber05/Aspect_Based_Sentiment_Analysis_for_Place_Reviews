@@ -27,6 +27,5 @@ crawler/backend/crawler/data/
 .DS_Store
 Thumbs.db
 
-# Models (large files, mounted at runtime)
-hf_absa_model/
+# Models (large weights, downloaded to huggingface_cache at runtime)
 training/final_weight/

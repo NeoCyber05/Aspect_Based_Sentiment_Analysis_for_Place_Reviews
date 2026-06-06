@@ -1,8 +1,10 @@
-# ABSA Review Intelligence
+# Place Review Sentiment Analyzer
 
 Aspect-Based Sentiment Analysis for place reviews — crawl, analyze, visualize.
 
-**Stack:** Go + FastAPI + React + Vite + SQLite + PyTorch
+**Stack:**
+
+![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-%23009688.svg?style=for-the-badge&logo=FastAPI&logoColor=white) ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361dafb) ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white) ![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
 
 ## Quick Start (Docker)
 
@@ -17,6 +19,25 @@ Open http://localhost:5173
 | Frontend | http://localhost:5173 |
 | Go API | http://localhost:8090/api/health |
 | Python ABSA | http://localhost:8091/health |
+
+## Fast Development (Native, without Docker)
+
+Hot-reload development without building Docker images. Requirements: Python virtual environment, Go, Node.js.
+
+```powershell
+# First time setup: create venv & install Python dependencies
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+
+# Run all 3 services (absa at :8091, backend at :8090, frontend at :5173) in separate windows
+.\dev.ps1 up
+# or: .\run.ps1 dev
+
+# Stop all services
+.\dev.ps1 stop
+```
+
+`dev.ps1` automatically runs `npm install` for the frontend if `node_modules` is missing. Modifying Python files (`.py`) triggers uvicorn reload; editing React files triggers Vite HMR; Go backend recompiles upon restarting the service window.
 
 ## Manual Dev Start
 
@@ -42,19 +63,19 @@ pip install -r requirements.txt
 python load_hf_model.py --repo-id NeoCyber/m-e5-small-vlsp2018-hotel --text "Phòng sạch sẽ, nhân viên thân thiện"
 ```
 
-## Run Tests
+## Optional: Ollama Narrative Generation
 
-```bash
-# Python
-python -m unittest tests.test_review_absa_analysis -v
+The Python ABSA service supports AI-generated Vietnamese narratives alongside ABSA metrics using a local Ollama instance. When enabled, instead of using static template-based summaries, the service sends structured ABSA metrics as context to Ollama to generate rich, natural language summaries (including positive strengths, negative issues, recommended actions, and sample size caveats).
 
-# Go
-cd crawler/backend && go test ./internal/app -v
+If Ollama is unavailable, times out, or encounters errors, the pipeline automatically falls back to the static template-based generator to ensure reliability.
 
-# Frontend build
-cd crawler/frontend && npm run build
-```
+### How to Setup and Configure
 
-## Optional: Ollama Narrative
-
-Set `ABSA_OLLAMA_URL` / `ABSA_OLLAMA_MODEL` env vars to enable AI-generated Vietnamese narratives alongside ABSA metrics.
+1. **Install Ollama**: Make sure Ollama is installed and running on your local machine.
+2. **Download Model**: Pull your preferred LLM model (e.g. `llama3.2:3b` or `qwen2.5:3b`) by running:
+   ```bash
+   ollama pull llama3.2:3b
+   ```
+3. **Set Environment Variables**: Configure the following environment variables before running your services:
+   - `ABSA_OLLAMA_URL`: The Ollama API endpoint (defaults to `http://localhost:11434` for native run. For Docker container setups, use `http://host.docker.internal:11434` to communicate with the host machine).
+   - `ABSA_OLLAMA_MODEL`: The name of the pulled model (defaults to `llama3.2:3b`).

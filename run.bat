@@ -22,6 +22,9 @@ if "%1"=="" (
     echo   build   - Build lai tat ca images
     echo   logs    - Xem logs tat ca services
     echo   status  - Kiem tra trang thai
+    echo.
+    echo   dev      - Chay nhanh KHONG Docker (native, hot-reload)
+    echo   dev-stop - Dung cac service native (port 8091/8090/5173)
     exit /b 0
 )
 
@@ -56,4 +59,31 @@ if "%1"=="logs" (
 
 if "%1"=="status" (
     docker compose ps
+)
+
+REM ===== Native dev (KHONG Docker) =====
+if "%1"=="dev" (
+    if not exist ".venv\Scripts\python.exe" (
+        echo [LOI] Khong thay .venv. Tao venv + cai requirements truoc.
+        exit /b 1
+    )
+    echo [1/3] ABSA  : http://localhost:8091
+    start "ABSA :8091" cmd /k ".venv\Scripts\python.exe -m uvicorn review_absa_pipeline.service:create_app --factory --host 0.0.0.0 --port 8091 --reload"
+    echo [2/3] Backend: http://localhost:8090
+    start "Backend :8090" cmd /k "cd crawler\backend && go run ./cmd/server --addr=:8090 --absa-service-url=http://127.0.0.1:8091 --disable-auto-analysis --concurrency=1 --poll-interval=2s"
+    echo [3/3] Frontend: http://localhost:5173
+    start "Frontend :5173" cmd /k "cd crawler\frontend && npm run dev -- --host"
+    echo.
+    echo Done. Ollama can chay rieng tai http://localhost:11434
+    echo Dung tat ca: run.bat dev-stop  (hoac dong tung cua so)
+)
+
+if "%1"=="dev-stop" (
+    for %%P in (8091 8090 5173) do (
+        for /f "tokens=5" %%I in ('netstat -ano ^| findstr ":%%P " ^| findstr LISTENING') do (
+            echo Killing PID %%I on port %%P
+            taskkill /F /PID %%I >nul 2>&1
+        )
+    )
+    echo Done.
 )

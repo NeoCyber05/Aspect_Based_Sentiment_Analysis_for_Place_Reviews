@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 param(
-    [ValidateSet("up","down","build","logs","status","help")]
+    [ValidateSet("up","down","build","logs","status","dev","dev-stop","help")]
     [string]$Command = "help"
 )
 
@@ -28,6 +28,9 @@ switch ($Command) {
         Write-Host "  build   - Build lai tat ca images"
         Write-Host "  logs    - Xem logs tat ca services"
         Write-Host "  status  - Kiem tra trang thai"
+        Write-Host ""
+        Write-Host "  dev      - Chay nhanh KHONG Docker (native, hot-reload) -> dev.ps1 up"
+        Write-Host "  dev-stop - Dung cac service native (port 8091/8090/5173)"
     }
     "up" {
         Show-Header
@@ -58,5 +61,11 @@ switch ($Command) {
     }
     "status" {
         docker compose ps
+    }
+    "dev" {
+        & (Join-Path $PSScriptRoot "dev.ps1") up
+    }
+    "dev-stop" {
+        & (Join-Path $PSScriptRoot "dev.ps1") stop
     }
 }
