@@ -72,7 +72,7 @@ if "%1"=="dev" (
     echo [2/3] Backend: http://localhost:8090
     start "Backend :8090" cmd /k "cd crawler\backend && go run ./cmd/server --addr=:8090 --absa-service-url=http://127.0.0.1:8091 --disable-auto-analysis --concurrency=1 --poll-interval=2s"
     echo [3/3] Frontend: http://localhost:5173
-    start "Frontend :5173" cmd /k "cd crawler\frontend && npm run dev -- --host"
+    start "Frontend :5173" cmd /k "cd crawler\frontend && pnpm dev --host"
     echo.
     echo Done. Ollama can chay rieng tai http://localhost:11434
     echo Dung tat ca: run.bat dev-stop  (hoac dong tung cua so)

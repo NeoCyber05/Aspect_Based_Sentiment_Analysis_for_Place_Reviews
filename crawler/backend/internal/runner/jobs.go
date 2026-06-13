@@ -23,7 +23,6 @@ func CreateSeedJobs(
 	r io.Reader,
 	maxDepth int,
 	maxPlaces int,
-	email bool,
 	geoCoordinates string,
 	zoom int,
 	radius float64,
@@ -107,7 +106,7 @@ func CreateSeedJobs(
 				opts = append(opts, gmaps.WithPlaceJobCrawlMode(crawlMode))
 			}
 
-			job = gmaps.NewPlaceJob(q.id, langCode, placeURL, email, extraReviews, opts...)
+			job = gmaps.NewPlaceJob(q.id, langCode, placeURL, extraReviews, opts...)
 		} else if !fastmode {
 			opts := []gmaps.GmapJobOptions{}
 			if dedup != nil {
@@ -129,7 +128,7 @@ func CreateSeedJobs(
 				opts = append(opts, gmaps.WithMaxPlaces(maxPlaces))
 			}
 
-			job = gmaps.NewGmapJob(q.id, langCode, q.text, maxDepth, email, geoCoordinates, zoom, opts...)
+			job = gmaps.NewGmapJob(q.id, langCode, q.text, maxDepth, geoCoordinates, zoom, opts...)
 		} else {
 			params := gmaps.MapSearchParams{
 				Location: gmaps.MapLocation{

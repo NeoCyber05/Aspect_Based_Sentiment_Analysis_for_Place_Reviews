@@ -22,7 +22,6 @@ type createJobRequest struct {
 	Radius         int      `json:"radius"`
 	Depth          int      `json:"depth"`
 	MaxPlaces      int      `json:"max_places"`
-	Email          bool     `json:"email"`
 	ExtraReviews   bool     `json:"extra_reviews"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
 	Proxies        []string `json:"proxies"`
@@ -56,7 +55,6 @@ type jobResponse struct {
 	Radius            int      `json:"radius"`
 	Depth             int      `json:"depth"`
 	MaxPlaces         int      `json:"max_places"`
-	Email             bool     `json:"email"`
 	ExtraReviews      bool     `json:"extra_reviews"`
 	MaxTimeSeconds    int      `json:"max_time_seconds"`
 	Proxies           []string `json:"proxies"`
@@ -144,7 +142,6 @@ func (r *createJobRequest) toWebJob() web.Job {
 			Radius:       r.Radius,
 			Depth:        r.Depth,
 			MaxPlaces:    r.MaxPlaces,
-			Email:        r.Email,
 			ExtraReviews: r.ExtraReviews,
 			MaxTime:      time.Duration(r.MaxTimeSeconds) * time.Second,
 			Proxies:      r.Proxies,
@@ -175,7 +172,6 @@ func toJobResponse(job web.Job, analysisStatus analysisStatusSnapshot) jobRespon
 		Radius:            job.Data.Radius,
 		Depth:             job.Data.Depth,
 		MaxPlaces:         job.Data.MaxPlaces,
-		Email:             job.Data.Email,
 		ExtraReviews:      job.Data.ExtraReviews,
 		MaxTimeSeconds:    int(job.Data.MaxTime.Seconds()),
 		Proxies:           job.Data.Proxies,

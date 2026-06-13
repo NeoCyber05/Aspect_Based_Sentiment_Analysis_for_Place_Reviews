@@ -18,12 +18,13 @@ type EmailExtractJobOptions func(*EmailExtractJob)
 type EmailExtractJob struct {
 	scrapemate.Job
 
-	Entry                   *Entry
+	WebsiteURL              string
+	Emails                  []string
 	ExitMonitor             exiter.Exiter
 	WriterManagedCompletion bool
 }
 
-func NewEmailJob(parentID string, entry *Entry, opts ...EmailExtractJobOptions) *EmailExtractJob {
+func NewEmailJob(parentID, websiteURL string, opts ...EmailExtractJobOptions) *EmailExtractJob {
 	const (
 		defaultPrio       = scrapemate.PriorityHigh
 		defaultMaxRetries = 0
@@ -34,13 +35,12 @@ func NewEmailJob(parentID string, entry *Entry, opts ...EmailExtractJobOptions) 
 			ID:         uuid.New().String(),
 			ParentID:   parentID,
 			Method:     "GET",
-			URL:        normalizeGoogleURL(entry.WebSite),
+			URL:        normalizeGoogleURL(websiteURL),
 			MaxRetries: defaultMaxRetries,
 			Priority:   defaultPrio,
 		},
+		WebsiteURL: websiteURL,
 	}
-
-	job.Entry = entry
 
 	for _, opt := range opts {
 		opt(&job)
@@ -79,12 +79,12 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 
 	// if html fetch failed just return
 	if resp.Error != nil {
-		return j.Entry, nil, nil
+		return j, nil, nil
 	}
 
 	doc, ok := resp.Document.(*goquery.Document)
 	if !ok {
-		return j.Entry, nil, nil
+		return j, nil, nil
 	}
 
 	emails := docEmailExtractor(doc)
@@ -92,9 +92,9 @@ func (j *EmailExtractJob) Process(ctx context.Context, resp *scrapemate.Response
 		emails = regexEmailExtractor(resp.Body)
 	}
 
-	j.Entry.Emails = emails
+	j.Emails = emails
 
-	return j.Entry, nil, nil
+	return j, nil, nil
 }
 
 func (j *EmailExtractJob) ProcessOnFetchError() bool {

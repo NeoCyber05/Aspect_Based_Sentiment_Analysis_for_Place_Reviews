@@ -23,7 +23,7 @@ export function NarrativePanel({ jobID, onGenerate }) {
       <div className="section-heading">
         <div>
           <h3>Phân tích diễn giải</h3>
-          <span>{narrative?.source === "ollama" ? "Sinh bởi Ollama từ kết quả ABSA" : "Không thay thế số liệu ABSA"}</span>
+          <span>{narrative?.source === "ollama" ? "Sinh bởi Ollama · diễn giải kết quả phân tích" : "Không thay thế số liệu thực tế"}</span>
         </div>
         <button type="button" className="ghost-button" onClick={() => handleGenerate(Boolean(narrative))} disabled={loading}>
           {loading ? "Đang tạo..." : narrative ? "Tạo lại" : "Tạo phân tích"}
@@ -52,7 +52,7 @@ export function NarrativePanel({ jobID, onGenerate }) {
           )}
         </div>
       ) : (
-        <p className="empty-analysis">Nhấn "Tạo phân tích" để Ollama diễn giải kết quả ABSA hiện có.</p>
+        <p className="empty-analysis">Nhấn "Tạo phân tích" để Ollama diễn giải kết quả phân tích hiện có.</p>
       )}
     </section>
   );

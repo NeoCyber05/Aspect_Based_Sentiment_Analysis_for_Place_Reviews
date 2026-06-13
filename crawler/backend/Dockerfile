@@ -1,6 +1,4 @@
-FROM golang:1.26-alpine AS builder
-
-RUN apk add --no-cache git
+FROM golang:1.26-bookworm AS builder
 
 WORKDIR /build
 
@@ -10,9 +8,22 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /absa-backend ./cmd/server
 
-FROM alpine:3.21
+# Build the playwright CLI from the pinned module version so the final stage
+# can install the matching driver + browser without needing Go.
+RUN CGO_ENABLED=0 go build -o /playwright-cli github.com/playwright-community/playwright-go/cmd/playwright
 
-RUN apk add --no-cache ca-certificates curl
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-install the playwright driver (node) and chromium together with the OS
+# libraries chromium needs. Baking these into the image avoids the runtime
+# glibc/musl download mismatch and makes playwright.Install() a no-op at boot.
+COPY --from=builder /playwright-cli /usr/local/bin/playwright
+RUN playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /absa-backend /absa-backend
 

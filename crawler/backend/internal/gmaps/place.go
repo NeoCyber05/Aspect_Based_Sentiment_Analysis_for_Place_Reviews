@@ -18,14 +18,13 @@ type PlaceJob struct {
 	scrapemate.Job
 
 	UsageInResultststs      bool
-	ExtractEmail            bool
 	ExitMonitor             exiter.Exiter
 	ExtractExtraReviews     bool
 	WriterManagedCompletion bool
 	CrawlMode               string
 }
 
-func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews bool, opts ...PlaceJobOptions) *PlaceJob {
+func NewPlaceJob(parentID, langCode, u string, extraExtraReviews bool, opts ...PlaceJobOptions) *PlaceJob {
 	const (
 		defaultPrio       = scrapemate.PriorityMedium
 		defaultMaxRetries = 3
@@ -44,7 +43,6 @@ func NewPlaceJob(parentID, langCode, u string, extractEmail, extraExtraReviews b
 	}
 
 	job.UsageInResultststs = true
-	job.ExtractEmail = extractEmail
 	job.ExtractExtraReviews = extraExtraReviews
 
 	for _, opt := range opts {
@@ -109,12 +107,7 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 		return nil, nil, err
 	}
 
-	entry.ID = j.ParentID
 	entry.CrawlMode = j.CrawlMode
-
-	if entry.Link == "" {
-		entry.Link = j.GetURL()
-	}
 
 	// Handle RPC-based reviews
 	allReviewsRaw, ok := resp.Meta["reviews_raw"].(FetchReviewsResponse)
@@ -135,22 +128,7 @@ func (j *PlaceJob) Process(_ context.Context, resp *scrapemate.Response) (any, [
 		}
 	}
 
-	if j.ExtractEmail && entry.IsWebsiteValidForEmail() {
-		opts := []EmailExtractJobOptions{}
-		if j.ExitMonitor != nil {
-			opts = append(opts, WithEmailJobExitMonitor(j.ExitMonitor))
-		}
-
-		if j.WriterManagedCompletion {
-			opts = append(opts, WithEmailJobWriterManagedCompletion())
-		}
-
-		emailJob := NewEmailJob(j.ID, &entry, opts...)
-
-		j.UsageInResultststs = false
-
-		return nil, []scrapemate.IJob{emailJob}, nil
-	} else if j.ExitMonitor != nil && !j.WriterManagedCompletion {
+	if j.ExitMonitor != nil && !j.WriterManagedCompletion {
 		j.ExitMonitor.IncrPlacesCompleted(1)
 	}
 

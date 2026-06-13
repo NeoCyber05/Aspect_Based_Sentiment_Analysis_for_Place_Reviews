@@ -1,10 +1,8 @@
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobAnalysis, fetchJobs, generateJobNarrative } from "./api";
-import { SentimentBar } from "./components/SentimentBar";
-import { NarrativePanel } from "./components/NarrativePanel";
-import { aspectDisplayName } from "./utils/aspectDisplay";
+import { analyzeJobCsv, createJob, deleteJob, downloadJobCsv, fetchJobAnalysis, fetchJobs } from "./api";
+import { AnalysisDashboard } from "./components/AnalysisDashboard";
 
 const vietMapApiKey = import.meta.env.VITE_VIETMAP_API_KEY?.trim() || "";
 const vietMapApiBase = "https://maps.vietmap.vn/api";
@@ -73,18 +71,16 @@ const initialForm = {
   radius: 10000,
   maxPlaces: 30,
   maxTimeSeconds: 600,
-  fastMode: false,
   urlMode: false,
-  email: false,
-  extraReviews: true,
   lat: "",
   lon: "",
   crawlMode: "full"
 };
 
 const defaultMapCenter = {
-  lat: 10.776889,
-  lng: 106.700806
+  // ĐH Bách Khoa TP.HCM - cổng Trần Đại Nghĩa
+  lat: 10.772047,
+  lng: 106.657747
 };
 
 const statusLabels = {
@@ -221,240 +217,7 @@ async function fetchVietMap(path, params, signal) {
   return data;
 }
 
-function AspectRows({ aspects, limit }) {
-  const rows = Array.isArray(aspects) ? aspects : [];
-  const shownRows = typeof limit === "number" ? rows.slice(0, limit) : rows;
 
-  if (shownRows.length === 0) {
-    return <p className="empty-analysis">Chưa có khía cạnh (aspect) nào được nhận diện.</p>;
-  }
-
-  return (
-    <div className="aspect-list">
-      {shownRows.map((item) => (
-        <article className="aspect-row" key={item.aspect}>
-          <div className="aspect-label">
-            <strong>{aspectDisplayName(item)}</strong>
-            <small>{item.mentions || 0} lượt đề cập</small>
-          </div>
-          <SentimentBar
-            positive={item.positive || 0}
-            neutral={item.neutral || 0}
-            negative={item.negative || 0}
-          />
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function PlaceAnalysis({ places }) {
-  const rows = Array.isArray(places) ? places : [];
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="place-analysis-list">
-      {rows.map((place, index) => {
-        const aspects = visibleAspects(place.aspects);
-        const overall = place.overall || {};
-        return (
-          <article className="place-analysis" key={place.input_id || `${place.title}-${index}`}>
-            <div className="place-analysis-heading">
-              <div>
-                <strong>{place.title || `Địa điểm ${index + 1}`}</strong>
-                <span>
-                  {place.description_count || 0} review có nội dung
-                  {place.domain?.domain ? ` · ${place.domain.domain}` : ""}
-                </span>
-              </div>
-              <span className="place-score">{scoreText(overall.score_5)}</span>
-            </div>
-            {Array.isArray(place.top_negative_aspects) && place.top_negative_aspects.length > 0 && (
-              <div className="mini-insight-list">
-                {place.top_negative_aspects.slice(0, 3).map((item) => (
-                  <span key={item.aspect}>{aspectDisplayName(item)}: {percentText(item.negative_percent)} tiêu cực</span>
-                ))}
-              </div>
-            )}
-            <AspectRows aspects={aspects} limit={5} />
-            {Array.isArray(place.evidence) && place.evidence.length > 0 && (
-              <div className="evidence-list compact">
-                {place.evidence.slice(0, 2).map((item, evidenceIndex) => (
-                  <blockquote key={`${place.input_id || index}-${evidenceIndex}`}>
-                    <p>{item.text}</p>
-                    <footer>
-                      {item.rating ? `${item.rating} sao` : "Không có rating"}
-{item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
-                    </footer>
-                  </blockquote>
-                ))}
-              </div>
-            )}
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
-function InsightCards({ result }) {
-  const overall = result?.overall || {};
-  const ratingVsText = result?.rating_vs_text || {};
-  return (
-    <div className="insight-grid">
-      <article>
-        <span>Tổng quan cảm xúc</span>
-        <strong>{percentText(overall.positive_percent)}</strong>
-        <small>{overall.positive || 0} tích cực · {overall.negative || 0} tiêu cực</small>
-      </article>
-      <article>
-        <span>Tỷ lệ tiêu cực</span>
-        <strong>{percentText(overall.negative_percent)}</strong>
-        <small>{overall.negative || 0} lượt đề cập tiêu cực</small>
-      </article>
-      <article>
-        <span>Địa điểm</span>
-        <strong>{result?.place_count || 0}</strong>
-        <small>{result?.description_count || 0} review có nội dung</small>
-      </article>
-      <article>
-        <span>Lệch sao / nội dung</span>
-        <strong>{ratingVsText.mismatch_count || 0}</strong>
-        <small>{ratingVsText.total_with_rating || 0} review có rating</small>
-      </article>
-    </div>
-  );
-}
-
-function AlertsList({ alerts }) {
-  const rows = Array.isArray(alerts) ? alerts : [];
-  if (rows.length === 0) {
-    return <p className="empty-analysis">Chưa có cảnh báo tiêu cực nổi bật.</p>;
-  }
-  return (
-    <div className="alert-list">
-      {rows.slice(0, 6).map((item) => (
-        <article key={item.aspect}>
-          <strong>{aspectDisplayName(item)}</strong>
-          <span>{item.negative || 0}/{item.mentions || 0} tiêu cực · {percentText(item.negative_percent)}</span>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function DomainSummary({ summary }) {
-  const rows = domainSummaryRows(summary);
-  const lowConfidence = Array.isArray(summary?.low_confidence) ? summary.low_confidence : [];
-  if (rows.length === 0) return null;
-  return (
-    <div className="domain-summary">
-      <div className="domain-grid">
-        {rows.map((item) => (
-          <article key={item.domain}>
-            <strong>{item.domain}</strong>
-            <span>{item.place_count || 0} địa điểm · {item.review_count || 0} reviews</span>
-            <small>Độ tin cậy {Number(item.avg_confidence || 0).toFixed(2)}</small>
-          </article>
-        ))}
-      </div>
-      {lowConfidence.length > 0 && (
-        <div className="low-confidence">
-          <strong>Cần kiểm tra domain routing</strong>
-          {lowConfidence.slice(0, 5).map((item) => (
-            <span key={`${item.input_id}-${item.domain}`}>
-              {item.title || item.input_id}: {item.domain} ({Number(item.confidence || 0).toFixed(2)})
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RatingMismatch({ data }) {
-  const examples = Array.isArray(data?.examples) ? data.examples : [];
-  if (examples.length === 0) return null;
-  return (
-    <div className="evidence-list">
-      {examples.slice(0, 4).map((item, index) => (
-        <blockquote key={`${item.input_id}-${index}`}>
-          <p>{item.text}</p>
-          <footer>
-            {item.title || item.input_id} · {item.rating} sao
-            {item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
-          </footer>
-        </blockquote>
-      ))}
-    </div>
-  );
-}
-
-function AnalysisDashboard({ result, jobID }) {
-  return (
-    <section className="panel analysis-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">ABSA tổng hợp</p>
-          <h2>Kết quả phân tích review</h2>
-        </div>
-        <span className="job-count">Job ID: {jobID}</span>
-      </div>
-
-      <div className="analysis-meta">
-        <span>{result.place_count || 0} địa điểm</span>
-        <span>{result.description_count || 0} review hợp lệ</span>
-        <span>{result.generated_at ? `Cập nhật ${formatDate(result.generated_at)}` : "Snapshot mới nhất"}</span>
-      </div>
-
-      <InsightCards result={result} />
-
-      <NarrativePanel jobID={jobID} onGenerate={generateJobNarrative} />
-
-      <div className="analysis-columns">
-        <section>
-          <div className="section-heading">
-            <h3>Vấn đề cần ưu tiên</h3>
-            <span>{result.alerts?.length || 0} cảnh báo</span>
-          </div>
-          <AlertsList alerts={result.alerts} />
-        </section>
-
-        <section>
-          <div className="section-heading">
-            <h3>Phân tích ngành hàng (Domain Routing)</h3>
-            <span>{domainSummaryRows(result.domain_summary).length} ngành hàng</span>
-          </div>
-          <DomainSummary summary={result.domain_summary} />
-        </section>
-      </div>
-
-      <div className="place-analysis-section">
-        <div className="section-heading">
-          <h3>Khía cạnh tổng hợp (Aspects)</h3>
-          <span>{visibleAspects(result.aspects).length} khía cạnh</span>
-        </div>
-        <AspectRows aspects={visibleAspects(result.aspects)} />
-      </div>
-
-      <div className="place-analysis-section">
-        <div className="section-heading">
-          <h3>Lệch giữa rating và nội dung</h3>
-          <span>{result.rating_vs_text?.mismatch_count || 0} review</span>
-        </div>
-        <RatingMismatch data={result.rating_vs_text} />
-      </div>
-
-      <div className="place-analysis-section">
-        <div className="section-heading">
-          <h3>Trung bình theo địa điểm</h3>
-          <span>{result.places?.length || 0} địa điểm</span>
-        </div>
-        <PlaceAnalysis places={result.places} />
-      </div>
-    </section>
-  );
-}
 
 function PlacePicker({ apiKey, onPick, selectedLocation }) {
   const mapElementRef = useRef(null);
@@ -512,7 +275,7 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
       container: mapElementRef.current,
       style: vietMapStyleUrl(apiKey),
       center: [start.lng, start.lat],
-      zoom: selectedLocation ? 16 : 12,
+      zoom: selectedLocation ? 16 : 15,
       attributionControl: true,
       vietmapLogo: true,
       transformRequest: (url) => ({
@@ -837,55 +600,136 @@ function SummaryMetrics({ jobs, completedJobs, analysisReadyJobs, workingJobs })
         <small>{failedJobs} cào thất bại</small>
       </article>
       <article>
-        <span>Đã chạy ABSA</span>
+        <span>Đã phân tích</span>
         <strong>{analysisReadyJobs.length}</strong>
         <small>{pendingAnalysis} job chờ phân tích</small>
       </article>
       <article>
-        <span>Luồng thông minh</span>
-        <strong>Thu thập → ABSA</strong>
-        <small>Mô hình cảm xúc khía cạnh</small>
+        <span>Luồng xử lý</span>
+        <strong>Thu thập → Phân tích</strong>
+        <small>Cảm xúc theo khía cạnh</small>
       </article>
     </section>
   );
 }
 
-function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze }) {
+function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, activeJobID }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all"); // "all" | "ready" | "pending"
+
+  const filtered = jobs.filter((job) => {
+    const matchSearch =
+      !search ||
+      job.name.toLowerCase().includes(search.toLowerCase()) ||
+      (job.keywords || []).some((k) => k.toLowerCase().includes(search.toLowerCase()));
+    const analysisStatus = job.analysis_status || "pending";
+    const matchFilter =
+      filter === "all" ||
+      (filter === "ready" && analysisStatus === "ok") ||
+      (filter === "pending" && analysisStatus !== "ok");
+    return matchSearch && matchFilter;
+  });
+
+  const readyCount = jobs.filter((j) => (j.analysis_status || "pending") === "ok").length;
+  const pendingCount = jobs.length - readyCount;
+
   return (
     <section className="panel analysis-queue">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Bộ lưu trữ ABSA</p>
-          <h2>Danh sách các Job đã hoàn tất dữ liệu cào</h2>
+      <div className="aq-header">
+        <div className="aq-title-row">
+          <span className="aq-title">Chọn job để xem kết quả</span>
+          <span className="job-count">{jobs.length}</span>
         </div>
-        <span className="job-count">{jobs.length} job đã sẵn sàng</span>
+
+        <div className="aq-search-wrap">
+          <span className="aq-search-icon">⌕</span>
+          <input
+            className="aq-search"
+            type="text"
+            placeholder="Tìm theo tên, từ khóa..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="aq-clear" onClick={() => setSearch("")} aria-label="Xóa">
+              ×
+            </button>
+          )}
+        </div>
+
+        <div className="aq-filter-row">
+          <button
+            type="button"
+            className={`aq-filter-btn ${filter === "all" ? "aq-filter-btn--active" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            Tất cả <em>{jobs.length}</em>
+          </button>
+          <button
+            type="button"
+            className={`aq-filter-btn ${filter === "ready" ? "aq-filter-btn--active" : ""}`}
+            onClick={() => setFilter("ready")}
+          >
+            Đã phân tích <em>{readyCount}</em>
+          </button>
+          <button
+            type="button"
+            className={`aq-filter-btn ${filter === "pending" ? "aq-filter-btn--active" : ""}`}
+            onClick={() => setFilter("pending")}
+          >
+            Chưa phân tích <em>{pendingCount}</em>
+          </button>
+        </div>
       </div>
 
-      <div className="analysis-job-grid">
-        {jobs.length === 0 ? (
-          <p className="empty-analysis">Chưa có dữ liệu nào sẵn sàng. Vui lòng chuyển sang tab Thu Thập Dữ Liệu để tạo job mới.</p>
+      <div className="aq-list">
+        {filtered.length === 0 ? (
+          <p className="aq-empty">
+            {jobs.length === 0
+              ? "Chưa có job nào. Hãy tạo job thu thập dữ liệu trước."
+              : "Không tìm thấy job phù hợp."}
+          </p>
         ) : (
-          jobs.map((job) => {
+          filtered.map((job) => {
             const busy = analyzingJobID === job.id;
             const analysisStatus = job.analysis_status || "pending";
             const analysisReady = analysisStatus === "ok";
             const analysisWorking = analysisStatus === "working";
+            const isActive = activeJobID === job.id && analysisReady;
             return (
-              <article className="analysis-job-card" key={job.id}>
-                <div className="analysis-job-card-header">
-                  <strong>{job.name}</strong>
-                  <span>Từ khóa: {job.keywords?.join(", ") || "-"}</span>
+              <article
+                key={job.id}
+                className={`aq-item ${isActive ? "aq-item--active" : ""} ${
+                  analysisReady ? "aq-item--ready" : ""
+                }`}
+              >
+                <div className="aq-item-top">
+                  <span className={`aq-status-dot aq-status-dot--${analysisStatus}`} aria-hidden />
+                  <strong className="aq-item-name" title={job.name}>
+                    {job.name}
+                  </strong>
                 </div>
-                <div className="analysis-job-meta">
-                  <span className={`status ${job.status}`}>{statusText(job.status)}</span>
-                  <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
-                </div>
+                {job.keywords?.length > 0 && (
+                  <div className="aq-item-keywords">
+                    {job.keywords.slice(0, 3).map((k) => (
+                      <span key={k} className="aq-keyword">{k}</span>
+                    ))}
+                    {job.keywords.length > 3 && (
+                      <span className="aq-keyword aq-keyword--more">+{job.keywords.length - 3}</span>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
-                  className={`ghost-button ${analysisReady ? "success-action" : "pending-action"}`}
+                  className={`aq-action-btn ${
+                    analysisReady ? "aq-action-btn--ready" : "aq-action-btn--run"
+                  }`}
                   onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
                   disabled={job.status !== "ok" || busy || analysisWorking}
                 >
+                  {busy || analysisWorking ? (
+                    <span className="aq-spinner" />
+                  ) : null}
                   {analysisButtonLabel(job, busy)}
                 </button>
               </article>
@@ -901,7 +745,6 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [form, setForm] = useState(initialForm);
-  const [batchMode, setBatchMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -988,7 +831,7 @@ export default function App() {
     );
   }, []);
 
-  async function onSubmit(event, overrides = {}) {
+  async function onSubmit(event) {
     event.preventDefault();
     setMessage("");
     setError("");
@@ -1012,38 +855,20 @@ export default function App() {
         zoom: Number(form.zoom),
         lat: form.lat.trim(),
         lon: form.lon.trim(),
-        fast_mode: overrides.fastMode ?? form.fastMode,
-        radius: Number(overrides.radius ?? form.radius),
+        fast_mode: false,
+        radius: Number(form.radius),
         depth: Number(form.depth),
-        max_places: Number(overrides.maxPlaces ?? form.maxPlaces),
-        email: form.email,
-        extra_reviews: form.extraReviews,
+        max_places: Number(form.maxPlaces),
+        extra_reviews: true,
         max_time_seconds: Number(form.maxTimeSeconds),
-        crawl_mode: overrides.crawlMode ?? form.crawlMode
+        crawl_mode: form.crawlMode
       };
 
-      const submitBatchMode = overrides.batchMode ?? batchMode;
-
-      if (!submitBatchMode) {
-        await createJob({
-          ...commonPayload,
-          keywords
-        });
-        setMessage("Đã khởi tạo job cào dữ liệu thành công.");
-      } else {
-        const settled = await Promise.allSettled(
-          keywords.map((keyword) =>
-            createJob({
-              ...commonPayload,
-              name: `${commonPayload.name} - ${keyword}`,
-              keywords: [keyword]
-            })
-          )
-        );
-        const successCount = settled.filter((item) => item.status === "fulfilled").length;
-        const failedCount = settled.length - successCount;
-        setMessage(`Đã hoàn tất gửi loạt: ${successCount} thành công, ${failedCount} thất bại.`);
-      }
+      await createJob({
+        ...commonPayload,
+        keywords
+      });
+      setMessage("Đã khởi tạo job cào dữ liệu thành công.");
 
       setForm((prev) => ({ ...initialForm, lang: prev.lang }));
       await loadJobs();
@@ -1075,7 +900,7 @@ export default function App() {
       setAnalysisResult(data || null);
       setAnalysisJobID(jobID);
       setActiveScreen("analysis");
-      setMessage("Đã kích hoạt mô hình ABSA phân tích file CSV thành công.");
+      setMessage("Đã kích hoạt phân tích. Kết quả sẽ hiển thị sau vài giây.");
       await loadJobs();
     } catch (err) {
       setError(err.message);
@@ -1094,12 +919,12 @@ export default function App() {
         setAnalysisResult(data.result);
         setAnalysisJobID(jobID);
         setActiveScreen("analysis");
-        setMessage("Đã tải dữ liệu snapshot phân tích ABSA.");
+        setMessage("Đã tải kết quả phân tích.");
       } else {
         setAnalysisResult(null);
         setAnalysisJobID(jobID);
         setActiveScreen("analysis");
-        setMessage(`Trạng thái ABSA: ${analysisStatusText(data?.status?.status)}.`);
+        setMessage(`Trạng thái phân tích: ${analysisStatusText(data?.status?.status)}.`);
       }
     } catch (err) {
       setError(err.message);
@@ -1112,8 +937,8 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-logo-area">
-          <p className="eyebrow">Trí Tuệ Nhân Tạo Phân Tích Review</p>
-          <h1>ABSA Review Intelligence</h1>
+          <p className="eyebrow">Phân tích đánh giá thông minh</p>
+          <h1>Review Intelligence</h1>
         </div>
         <div className="topbar-actions">
           <button type="button" className="ghost-button" onClick={loadJobs} disabled={loadingJobs}>
@@ -1155,29 +980,39 @@ export default function App() {
             workingJobs={workingJobs}
           />
 
-          <AnalysisQueue
-            jobs={analysisJobs}
-            analyzingJobID={analyzingJobID}
-            onViewAnalysis={onViewAnalysis}
-            onAnalyze={onAnalyze}
-          />
+          <div className="analysis-workspace-grid">
+            {/* Left: Job Queue (compact, scrollable) */}
+            <aside className="analysis-queue-sidebar">
+              <AnalysisQueue
+                jobs={analysisJobs}
+                analyzingJobID={analyzingJobID}
+                onViewAnalysis={onViewAnalysis}
+                onAnalyze={onAnalyze}
+                activeJobID={analysisJobID}
+              />
+            </aside>
 
-          {analysisResult ? (
-            <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />
-          ) : (
-            <section className="panel empty-analysis-workspace">
-              <div className="empty-analysis-icon-title">
-                <p className="eyebrow">Không gian phân tích</p>
-                <h2>Chọn một Snapshot ABSA ở trên để mở Dashboard</h2>
-              </div>
-              <span className="empty-analysis-description">
-                {selectedAnalysisJob
-                  ? `${selectedAnalysisJob.name}: ${analysisStatusText(selectedAnalysisJob.analysis_status)}`
-                  : "Bảng dữ liệu sẽ tự động tổng hợp phân tích điểm số khía cạnh (aspect score), điểm đau khách hàng (pain points), xếp hạng địa điểm (places ranking) và trích xuất các câu review bằng chứng thực tế từ tệp dữ liệu đã thu thập."}
-              </span>
-            </section>
-          )}
+            {/* Right: Dashboard or empty state — always visible */}
+            <div className="analysis-dashboard-pane">
+              {analysisResult ? (
+                <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />
+              ) : (
+                <section className="panel empty-analysis-workspace">
+                  <div className="empty-analysis-icon-title">
+                    <p className="eyebrow">Không gian phân tích</p>
+                    <h2>Chọn một Snapshot ABSA để mở Dashboard</h2>
+                  </div>
+                  <span className="empty-analysis-description">
+                    {selectedAnalysisJob
+                      ? `${selectedAnalysisJob.name}: ${analysisStatusText(selectedAnalysisJob.analysis_status)}`
+                      : "Chọn một job đã phân tích ở bên trái để xem kết quả ABSA — aspect score, pain points, places ranking và review dẫn chứng."}
+                  </span>
+                </section>
+              )}
+            </div>
+          </div>
         </>
+
       ) : (
         <>
           <main className="workspace-grid crawler-screen">
@@ -1264,7 +1099,7 @@ export default function App() {
                 <label className="field">
                   <span>Chế độ thu thập</span>
                   <select value={form.crawlMode} onChange={(e) => updateField("crawlMode", e.target.value)}>
-                    <option value="full">Tải đầy đủ (Để chạy ABSA)</option>
+                    <option value="full">Tải đầy đủ (Để phân tích)</option>
                     <option value="train">Chỉ tải Tiêu đề & Ngành hàng (Để huấn luyện)</option>
                   </select>
                 </label>
@@ -1281,42 +1116,10 @@ export default function App() {
                   <label>
                     <input
                       type="checkbox"
-                      checked={batchMode}
-                      onChange={(e) => setBatchMode(e.target.checked)}
-                    />
-                    <span>Chạy chế độ hàng loạt (Batch)</span>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={form.fastMode}
-                      onChange={(e) => updateField("fastMode", e.target.checked)}
-                    />
-                    <span>Chế độ cào nhanh (Fast)</span>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
                       checked={form.urlMode}
                       onChange={(e) => updateField("urlMode", e.target.checked)}
                     />
                     <span>Chỉ dùng URL nguồn</span>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={form.email}
-                      onChange={(e) => updateField("email", e.target.checked)}
-                    />
-                    <span>Tìm kiếm email</span>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={form.extraReviews}
-                      onChange={(e) => updateField("extraReviews", e.target.checked)}
-                    />
-                    <span>Thu thập thêm review</span>
                   </label>
                 </div>
 
@@ -1369,7 +1172,7 @@ export default function App() {
                   <tr>
                     <th>Tên Job</th>
                     <th>Thu thập</th>
-                    <th>Trạng thái ABSA</th>
+                    <th>Trạng thái phân tích</th>
                     <th>Ngày tạo</th>
                     <th>Từ khóa</th>
                     <th>Giới hạn địa điểm</th>
@@ -1413,7 +1216,7 @@ export default function App() {
                                 className="analysis"
                                 onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
                                 disabled={job.status !== "ok" || busy || analysisWorking}
-                                title={job.status !== "ok" ? "Chỉ chạy ABSA khi job cào thành công" : "Bắt đầu chạy phân tích ABSA"}
+                                title={job.status !== "ok" ? "Cần hoàn tất thu thập trước khi phân tích" : "Bắt đầu phân tích review"}
                               >
                                 {analysisButtonLabel(job, busy)}
                               </button>

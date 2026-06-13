@@ -20,7 +20,7 @@ Open http://localhost:5173
 | Go API | http://localhost:8090/api/health |
 | Python ABSA | http://localhost:8091/health |
 
-## Fast Development (Native, without Docker)
+## Quick Start
 
 Hot-reload development without building Docker images. Requirements: Python virtual environment, Go, Node.js.
 
@@ -72,10 +72,10 @@ If Ollama is unavailable, times out, or encounters errors, the pipeline automati
 ### How to Setup and Configure
 
 1. **Install Ollama**: Make sure Ollama is installed and running on your local machine.
-2. **Download Model**: Pull your preferred LLM model (e.g. `llama3.2:3b` or `qwen2.5:3b`) by running:
+2. **Download Model**: Pull your preferred LLM model (e.g. `gemma4:e4b` or `qwen2.5:3b`) by running:
    ```bash
-   ollama pull llama3.2:3b
+   ollama pull gemma4:e4b
    ```
 3. **Set Environment Variables**: Configure the following environment variables before running your services:
    - `ABSA_OLLAMA_URL`: The Ollama API endpoint (defaults to `http://localhost:11434` for native run. For Docker container setups, use `http://host.docker.internal:11434` to communicate with the host machine).
-   - `ABSA_OLLAMA_MODEL`: The name of the pulled model (defaults to `llama3.2:3b`).
+   - `ABSA_OLLAMA_MODEL`: The name of the pulled model (defaults to `gemma4:e4b`).

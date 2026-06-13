@@ -1,0 +1,19 @@
+{
+  "caveats": [],
+  "issues": [
+    "ROOM_AMENITIES#DESIGN\u0026FEATURES: 2 lượt tiêu cực trên 2 lượt đề cập (100%).",
+    "FOOD\u0026DRINKS#PRICES: 1 lượt tiêu cực trên 1 lượt đề cập (100%).",
+    "FOOD\u0026DRINKS#STYLE\u0026OPTIONS: 1 lượt tiêu cực trên 1 lượt đề cập (100%)."
+  ],
+  "recommended_actions": [
+    "Ưu tiên đọc các review bằng chứng ở những khía cạnh có cảnh báo.",
+    "Không kết luận mạnh với khía cạnh có rất ít lượt đề cập."
+  ],
+  "source": "template",
+  "strengths": [
+    "SERVICE#GENERAL: 82 lượt tích cực trên 82 lượt đề cập.",
+    "HOTEL#GENERAL: 75 lượt tích cực trên 75 lượt đề cập.",
+    "HOTEL#COMFORT: 27 lượt tích cực trên 27 lượt đề cập."
+  ],
+  "summary": "Kết quả ABSA ghi nhận 296 lượt khía cạnh, trong đó 97.97% tích cực và 2.03% tiêu cực."
+}
