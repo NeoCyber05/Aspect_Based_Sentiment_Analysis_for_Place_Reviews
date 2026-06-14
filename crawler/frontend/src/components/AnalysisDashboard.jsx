@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SentimentBar } from "./SentimentBar";
 import { aspectDisplayName } from "../utils/aspectDisplay";
-import { AnalysisMap } from "./AnalysisMap";
+
 
 function formatDate(isoString) {
   const date = new Date(isoString);
@@ -229,12 +229,11 @@ function RatingDistribution({ distribution, max }) {
 }
 
 // ── Place Analysis Cards ─────────────────────────────────────────
-function PlaceCard({ place, index, onViewOnMap }) {
+function PlaceCard({ place, index }) {
   const [expanded, setExpanded] = useState(false);
   const aspects = visibleAspects(place.aspects);
   const rawRating = place.review_rating;
   const adjusted = place.adjusted_avg_rating ?? rawRating ?? 0;
-  const hasCoords = place.latitude !== undefined && place.latitude !== null && place.longitude !== undefined && place.longitude !== null;
   const scoreColor = adjusted >= 4 ? "#22c55e" : adjusted >= 3 ? "#f59e0b" : "#ef4444";
 
   return (
@@ -278,16 +277,6 @@ function PlaceCard({ place, index, onViewOnMap }) {
             <RatingDistribution distribution={place.reviews_per_rating} />
           </div>
 
-          {hasCoords && (
-            <button
-              type="button"
-              className="dash-view-map-btn"
-              onClick={() => onViewOnMap?.(place.title)}
-            >
-              📍 Xem trên bản đồ
-            </button>
-          )}
-
           {Array.isArray(place.top_negative_aspects) && place.top_negative_aspects.length > 0 && (
             <div className="dash-place-negatives">
               <span className="dash-place-section-label">Điểm tiêu cực nổi bật</span>
@@ -320,15 +309,28 @@ function PlaceCard({ place, index, onViewOnMap }) {
           {Array.isArray(place.evidence) && place.evidence.length > 0 && (
             <div className="dash-place-evidence">
               <span className="dash-place-section-label">Review dẫn chứng</span>
-              {place.evidence.slice(0, 2).map((item, evidenceIndex) => (
-                <blockquote key={`${place.title || index}-${evidenceIndex}`} className="dash-evidence-quote">
-                  <p>{item.text}</p>
-                  <footer>
-                    {item.rating ? `⭐ ${item.rating} sao` : "Không có rating"}
-                    {item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
-                  </footer>
-                </blockquote>
-              ))}
+              {(() => {
+                const filtered = place.evidence
+                  .filter((item) => Number(item.rating) !== 5)
+                  .sort((a, b) => {
+                    const ra = Number(a.rating) || 0;
+                    const rb = Number(b.rating) || 0;
+                    const aPriority = ra <= 3 ? 0 : 1;
+                    const bPriority = rb <= 3 ? 0 : 1;
+                    if (aPriority !== bPriority) return aPriority - bPriority;
+                    return ra - rb;
+                  });
+                const items = filtered.length > 0 ? filtered : place.evidence;
+                return items.slice(0, 2).map((item, evidenceIndex) => (
+                  <blockquote key={`${place.title || index}-${evidenceIndex}`} className="dash-evidence-quote">
+                    <p>{item.text}</p>
+                    <footer>
+                      {item.rating ? `⭐ ${item.rating} sao` : "Không có rating"}
+                      {item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
+                    </footer>
+                  </blockquote>
+                ));
+              })()}
             </div>
           )}
         </div>
@@ -337,7 +339,7 @@ function PlaceCard({ place, index, onViewOnMap }) {
   );
 }
 
-function PlaceAnalysisList({ places, onViewOnMap }) {
+function PlaceAnalysisList({ places }) {
   const rows = Array.isArray(places) ? places : [];
   if (rows.length === 0) return <p className="dash-empty">Không có dữ liệu địa điểm.</p>;
   return (
@@ -347,7 +349,6 @@ function PlaceAnalysisList({ places, onViewOnMap }) {
           key={place.title || `${index}`}
           place={place}
           index={index}
-          onViewOnMap={onViewOnMap}
         />
       ))}
     </div>
@@ -357,27 +358,18 @@ function PlaceAnalysisList({ places, onViewOnMap }) {
 // ── Tab Definitions ──────────────────────────────────────────────
 const TABS = [
   { id: "overview", label: "Tổng quan", icon: "◉" },
-  { id: "aspects", label: "Khía cạnh", icon: "◈" },
   { id: "places", label: "Địa điểm", icon: "⬡" },
-  { id: "map", label: "Bản đồ", icon: "⌖" },
 ];
 
 // ── Main Dashboard ───────────────────────────────────────────────
 export function AnalysisDashboard({ result, jobID }) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [selectedPlaceId, setSelectedPlaceId] = useState(null);
 
   const placesCount = result?.places?.length || 0;
   const aspectsCount = visibleAspects(result?.aspects).length;
 
   const tabCounts = {
-    aspects: aspectsCount,
     places: placesCount,
-  };
-
-  const handleViewOnMap = (placeId) => {
-    setSelectedPlaceId(placeId);
-    setActiveTab("map");
   };
 
   return (
@@ -426,23 +418,7 @@ export function AnalysisDashboard({ result, jobID }) {
           {activeTab === "overview" && (
             <div className="dash-section">
               <div className="dash-section-header">
-                <h3>Top khía cạnh nổi bật</h3>
-                <button
-                  type="button"
-                  className="dash-view-all-btn"
-                  onClick={() => setActiveTab("aspects")}
-                >
-                  Xem tất cả {aspectsCount} →
-                </button>
-              </div>
-              <AspectGrid aspects={visibleAspects(result?.aspects).slice(0, 6)} />
-            </div>
-          )}
-
-          {activeTab === "aspects" && (
-            <div className="dash-section">
-              <div className="dash-section-header">
-                <h3>Tất cả khía cạnh (Aspects)</h3>
+                <h3>Khía cạnh nổi bật</h3>
                 <span>{aspectsCount} khía cạnh được nhận diện</span>
               </div>
               <AspectGrid aspects={result?.aspects} />
@@ -453,19 +429,9 @@ export function AnalysisDashboard({ result, jobID }) {
             <div className="dash-section">
               <div className="dash-section-header">
                 <h3>Phân tích theo địa điểm</h3>
-                <span>{placesCount} địa điểm · Click để xem chi tiết · Ấn “Xem trên bản đồ” để định vị</span>
+                <span>{placesCount} địa điểm · Click để xem chi tiết</span>
               </div>
-              <PlaceAnalysisList places={result?.places} onViewOnMap={handleViewOnMap} />
-            </div>
-          )}
-
-          {activeTab === "map" && (
-            <div className="dash-section">
-              <AnalysisMap
-                places={result?.places || []}
-                selectedPlaceId={selectedPlaceId}
-                onSelectPlace={setSelectedPlaceId}
-              />
+              <PlaceAnalysisList places={result?.places} />
             </div>
           )}
         </div>

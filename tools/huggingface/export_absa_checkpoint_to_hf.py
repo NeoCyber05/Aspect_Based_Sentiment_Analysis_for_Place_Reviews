@@ -19,6 +19,65 @@ from hf_absa_model import ABSAConfig, ABSAForAspectSentimentClassification
 
 DEFAULT_BASE_MODEL = "intfloat/multilingual-e5-small"
 SENTIMENT_LABELS = ["none", "positive", "negative", "neutral"]
+MODEL_CARD_METADATA = {
+    "vlsp-2018-restaurant-e5-small-best": {
+        "dataset_name": "VLSP 2018 Sentiment Analysis - Restaurant",
+        "dataset_path": "training/datasets/vlsp2018_restaurant",
+        "notebook": "training/pipeline/full_pipeline_res.ipynb",
+        "metrics": {
+            "aspect_category": {
+                "precision": 0.816910,
+                "recall": 0.825833,
+                "f1": 0.815224,
+                "support": 6000,
+            },
+            "aspect_category_polarity": {
+                "precision": 0.749515,
+                "recall": 0.755833,
+                "f1": 0.733340,
+                "support": 6000,
+            },
+        },
+    },
+    "vlsp-2018-hotel-e5-small-best": {
+        "dataset_name": "VLSP 2018 Sentiment Analysis - Hotel",
+        "dataset_path": "training/datasets/vlsp2018_hotel",
+        "notebook": "training/pipeline/full_pipeline_hotel.ipynb",
+        "metrics": {
+            "aspect_category": {
+                "precision": 0.937400,
+                "recall": 0.941520,
+                "f1": 0.931863,
+                "support": 20400,
+            },
+            "aspect_category_polarity": {
+                "precision": 0.931039,
+                "recall": 0.933578,
+                "f1": 0.919990,
+                "support": 20400,
+            },
+        },
+    },
+    "hosrev-e5-small-best": {
+        "dataset_name": "HosRev",
+        "dataset_path": "training/datasets/hosrev",
+        "notebook": "training/pipeline/full_pipeline_hosRev.ipynb",
+        "metrics": {
+            "aspect_category": {
+                "precision": 0.894861,
+                "recall": 0.905712,
+                "f1": 0.897999,
+                "support": 12727,
+            },
+            "aspect_category_polarity": {
+                "precision": 0.887875,
+                "recall": 0.898248,
+                "f1": 0.889022,
+                "support": 12727,
+            },
+        },
+    },
+}
 
 
 def _torch_load_kwargs() -> dict[str, Any]:
@@ -56,6 +115,25 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_jsonable(item) for item in value]
     return value
+
+
+def resolve_model_card_metadata(checkpoint_path: str | Path, repo_id: str | None = None) -> dict[str, Any]:
+    checkpoint_stem = Path(checkpoint_path).stem
+    candidates = [checkpoint_stem]
+    if repo_id:
+        repo_name = repo_id.rsplit("/", 1)[-1]
+        candidates.append(repo_name)
+        if repo_name == "m-e5-small-vlsp2018-restaurant":
+            candidates.append("vlsp-2018-restaurant-e5-small-best")
+        elif repo_name == "m-e5-small-vlsp2018-hotel":
+            candidates.append("vlsp-2018-hotel-e5-small-best")
+        elif repo_name == "m-e5-small-hosrev":
+            candidates.append("hosrev-e5-small-best")
+
+    for candidate in candidates:
+        if candidate in MODEL_CARD_METADATA:
+            return MODEL_CARD_METADATA[candidate]
+    return {}
 
 
 def build_model(
@@ -96,6 +174,35 @@ def write_model_card(
     metrics = json.dumps(_jsonable(checkpoint.get("metrics", {})), ensure_ascii=False, indent=2)
     aspects = "\n".join(f"- {name}" for name in config.aspect_category_names)
     repo_heading = repo_id or output_dir.name
+    card_metadata = resolve_model_card_metadata(checkpoint_path, repo_id=repo_id)
+    dataset_lines = ""
+    weighted_metrics_lines = ""
+    if card_metadata:
+        dataset_lines = f"""
+## Training Dataset
+
+- Dataset: {card_metadata["dataset_name"]}
+- Local dataset path: `{card_metadata["dataset_path"]}`
+- Result source: `{card_metadata["notebook"]}`
+"""
+        rows = []
+        for metric_name, metric_values in card_metadata["metrics"].items():
+            rows.append(
+                "| {name} | {precision:.6f} | {recall:.6f} | {f1:.6f} | {support} |".format(
+                    name=metric_name,
+                    precision=metric_values["precision"],
+                    recall=metric_values["recall"],
+                    f1=metric_values["f1"],
+                    support=metric_values["support"],
+                ),
+            )
+        weighted_metrics_lines = f"""
+## Test Metrics (Weighted Avg)
+
+| Report | Precision | Recall | F1 | Support |
+|--------|-----------|--------|----|---------|
+{chr(10).join(rows)}
+"""
 
     readme = f"""---
 language:
@@ -122,8 +229,10 @@ Aspect-based sentiment model exported from `{checkpoint_path.name}`.
 - Multi branch: `{config.multi_branch}`
 - Aspect count: `{len(config.aspect_category_names)}`
 - Sentiment labels: `{", ".join(config.sentiment_labels)}`
+{dataset_lines}
+{weighted_metrics_lines}
 
-## Metrics
+## Checkpoint Metrics
 
 ```json
 {metrics}
