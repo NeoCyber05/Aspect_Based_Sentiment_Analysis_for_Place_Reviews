@@ -57,8 +57,6 @@ func ParseSearchResults(raw []byte) ([]*Entry, error) {
 			entry.Longitude = getNthElementAndCast[float64](business, 21, 3)
 		}
 
-		entry.OpenHours = getHours(business)
-
 		entries = append(entries, &entry)
 	}
 

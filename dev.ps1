@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # =============================================================
-#  ABSA Review Intelligence - Native dev runner (KHONG dung Docker)
+#  Place Review Sentiment Analyzer - Native dev runner (KHONG dung Docker)
 #  Chay 3 services truc tiep tren host de dev nhanh:
 #    - absa     : uvicorn + --reload (sua .py la reload, khong build lai)
 #    - backend  : go run (recompile khi restart)

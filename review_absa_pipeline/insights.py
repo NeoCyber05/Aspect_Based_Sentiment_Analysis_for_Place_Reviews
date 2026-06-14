@@ -43,6 +43,27 @@ def _place_evidence(reviews: list[dict[str, Any]], limit: int = 5) -> list[dict[
         )
         if len(evidence) >= limit:
             break
+    if not evidence:
+        for review in reviews:
+            prediction = review.get("prediction") or {}
+            positives = _positive_aspects(prediction)
+            if not positives:
+                continue
+            text = review.get("text", "")
+            if len(text) <= 10:
+                continue
+            evidence.append(
+                {
+                    "text": text,
+                    "rating": review.get("rating"),
+                    "when": review.get("when", ""),
+                    "reviewer_name": review.get("reviewer_name", ""),
+                    "negative_aspects": [],
+                    "positive_aspects": positives,
+                }
+            )
+            if len(evidence) >= limit:
+                break
     return evidence
 
 
@@ -272,7 +293,6 @@ def build_analysis_result(
                 "review_count": place.get("review_count"),
                 "review_rating": place.get("review_rating"),
                 "reviews_per_rating": place.get("reviews_per_rating", {}),
-                "open_hours": place.get("open_hours", {}),
                 "latitude": place.get("latitude"),
                 "longitude": place.get("longitude"),
                 "adjusted_avg_rating": _adjusted_avg_rating(

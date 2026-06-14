@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   ABSA Review Intelligence - Docker
+echo   Place Review Sentiment Analyzer - Docker
 echo ========================================
 echo.
 

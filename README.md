@@ -1,8 +1,12 @@
 # Place Review Sentiment Analyzer
 
-Aspect-Based Sentiment Analysis for place reviews — crawl, analyze, visualize.
+End-to-end Aspect-Based Sentiment Analysis (ABSA) for place reviews in Vietnamese. The pipeline crawls Google Maps reviews, extracts aspects (food, service, price, etc.) with sentiment polarity using fine-tuned PyTorch/Transformers models, and visualizes results on an interactive dashboard.
 
-**Stack:**
+**Supported domains:** restaurants, hotels, hospitals, universities — automatically routed via a trained domain classifier.
+
+**Pipeline:** Crawl (Go + scrapemate) -> Analyze (FastAPI + PyTorch + VnCoreNLP) -> Visualize (React + Vite + Vietmap GL)
+
+## Stack
 
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-%23009688.svg?style=for-the-badge&logo=FastAPI&logoColor=white) ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361dafb) ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white) ![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
 
@@ -42,12 +46,6 @@ cd crawler/frontend && npm install && npm run dev
 
 Configure `crawler/frontend/.env.local` with `VITE_VIETMAP_API_KEY` for map features.
 
-## Load Models
-
-```bash
-pip install -r requirements.txt
-python load_hf_model.py --repo-id NeoCyber/m-e5-small-vlsp2018-hotel --text "Phòng sạch sẽ, nhân viên thân thiện"
-```
 
 ## Run Docker
 

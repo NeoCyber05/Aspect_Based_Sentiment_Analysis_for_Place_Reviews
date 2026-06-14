@@ -24,7 +24,7 @@ type Entry struct {
 	Title      string              `json:"title"`
 	Categories []string            `json:"categories"`
 	Category   string              `json:"category"`
-	OpenHours  map[string][]string `json:"open_hours"`
+
 	Latitude            float64                `json:"latitude"`
 	Longitude           float64                `json:"longitude"`
 	ReviewCount         int                    `json:"review_count"`
@@ -57,7 +57,6 @@ func (e *Entry) CsvHeaders() []string {
 	return []string{
 		"title",
 		"category",
-		"open_hours",
 		"review_count",
 		"review_rating",
 		"reviews_per_rating",
@@ -79,7 +78,6 @@ func (e *Entry) CsvRow() []string {
 	return []string{
 		e.Title,
 		e.Category,
-		stringify(e.OpenHours),
 		stringify(e.ReviewCount),
 		stringify(e.ReviewRating),
 		stringify(e.ReviewsPerRating),
@@ -188,7 +186,6 @@ func EntryFromJSON(raw []byte, reviewCountOnly ...bool) (entry Entry, err error)
 		entry.Category = entry.Categories[0]
 	}
 
-	entry.OpenHours = getHours(darray)
 	entry.Latitude = getNthElementAndCast[float64](darray, 21, 2)
 	entry.Longitude = getNthElementAndCast[float64](darray, 21, 3)
 	if entry.Latitude == 0 && entry.Longitude == 0 {
@@ -315,71 +312,6 @@ func parseReviews(reviewsI []any) []Review {
 	}
 
 	return ans
-}
-
-//nolint:gomnd // it's ok, I need the indexes
-func getHours(darray []any) map[string][]string {
-	// Try new structure first (as of Nov 2025) - darray[203][0]
-	items := getNthElementAndCast[[]any](darray, 203, 0)
-	if len(items) == 0 {
-		// Fall back to old structure - darray[34][1]
-		items = getNthElementAndCast[[]any](darray, 34, 1)
-	}
-
-	hours := make(map[string][]string, len(items))
-
-	for _, item := range items {
-		itemArray, ok := item.([]any)
-		if !ok {
-			continue
-		}
-
-		// New structure: [0] = day name, [3] = time slots array
-		day := getNthElementAndCast[string](itemArray, 0)
-		if day == "" {
-			continue
-		}
-
-		// Try new structure for times
-		timeSlotsI := getNthElementAndCast[[]any](itemArray, 3)
-		if len(timeSlotsI) > 0 {
-			// New format: each slot is [formatted_string, [[hour, min], [hour, min]]]
-			times := make([]string, 0, len(timeSlotsI))
-
-			for _, slot := range timeSlotsI {
-				slotArray, ok := slot.([]any)
-				if !ok || len(slotArray) == 0 {
-					continue
-				}
-
-				// Get the formatted time string (e.g., "11 am–1:30 pm")
-				timeStr := getNthElementAndCast[string](slotArray, 0)
-				if timeStr != "" {
-					times = append(times, timeStr)
-				}
-			}
-
-			if len(times) > 0 {
-				hours[day] = times
-			}
-		} else {
-			// Fall back to old structure: [1] = times array
-			timesI := getNthElementAndCast[[]any](itemArray, 1)
-			times := make([]string, 0, len(timesI))
-
-			for i := range timesI {
-				if timeStr, ok := timesI[i].(string); ok {
-					times = append(times, timeStr)
-				}
-			}
-
-			if len(times) > 0 {
-				hours[day] = times
-			}
-		}
-	}
-
-	return hours
 }
 
 func getNthElementAndCast[T any](arr []any, indexes ...int) T {

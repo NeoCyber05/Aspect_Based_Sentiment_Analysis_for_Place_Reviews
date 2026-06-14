@@ -46,7 +46,6 @@ class PlaceReviewBatch:
     review_count: int | None = None
     review_rating: float | None = None
     reviews_per_rating: dict[str, int] = field(default_factory=dict)
-    open_hours: dict[str, Any] = field(default_factory=dict)
     latitude: float | None = None
     longitude: float | None = None
 
@@ -183,18 +182,6 @@ def _parse_reviews_per_rating(value: Any) -> dict[str, int]:
     return result
 
 
-def _parse_open_hours(value: Any) -> dict[str, Any]:
-    if not value:
-        return {}
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(parsed, dict):
-        return {}
-    return dict(parsed)
-
-
 def _parse_float(value: Any) -> float | None:
     if value is None or value == "":
         return None
@@ -231,7 +218,6 @@ def load_place_review_batches(csv_path: str | Path) -> list[PlaceReviewBatch]:
                     review_count=int(float(row.get("review_count") or 0)) or None,
                     review_rating=_parse_float(row.get("review_rating")),
                     reviews_per_rating=_parse_reviews_per_rating(row.get("reviews_per_rating", "")),
-                    open_hours=_parse_open_hours(row.get("open_hours", "")),
                     latitude=_parse_float(row.get("latitude")),
                     longitude=_parse_float(row.get("longitude")),
                 )

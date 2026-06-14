@@ -6,7 +6,7 @@ param(
 
 function Show-Header {
     Write-Host "`n========================================" -ForegroundColor Cyan
-    Write-Host "  ABSA Review Intelligence - Docker" -ForegroundColor Cyan
+    Write-Host "  Place Review Sentiment Analyzer - Docker" -ForegroundColor Cyan
     Write-Host "========================================`n" -ForegroundColor Cyan
 }
 

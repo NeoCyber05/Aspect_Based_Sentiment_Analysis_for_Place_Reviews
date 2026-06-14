@@ -24,7 +24,7 @@ class NarrativeRequest(BaseModel):
 
 
 def create_app(engine: AnalysisEngine | None = None):
-    app = FastAPI(title="ABSA Review Analysis Service")
+    app = FastAPI(title="Place Review Sentiment Analyzer")
     analysis_engine = engine
     if analysis_engine is None:
         analysis_engine = AnalysisEngine(model_manager=ModelManager())

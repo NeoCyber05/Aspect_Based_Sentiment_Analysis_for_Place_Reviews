@@ -310,7 +310,10 @@ function PlaceCard({ place, index }) {
             <div className="dash-place-evidence">
               <span className="dash-place-section-label">Review dẫn chứng</span>
               {(() => {
-                const filtered = place.evidence
+                const negativeItems = place.evidence.filter((item) => item.negative_aspects?.length > 0);
+                const positiveItems = place.evidence.filter((item) => item.positive_aspects?.length > 0 && !item.negative_aspects?.length && (item.text?.length || 0) > 10);
+
+                const filteredNegative = negativeItems
                   .filter((item) => Number(item.rating) !== 5)
                   .sort((a, b) => {
                     const ra = Number(a.rating) || 0;
@@ -320,13 +323,19 @@ function PlaceCard({ place, index }) {
                     if (aPriority !== bPriority) return aPriority - bPriority;
                     return ra - rb;
                   });
-                const items = filtered.length > 0 ? filtered : place.evidence;
-                return items.slice(0, 2).map((item, evidenceIndex) => (
+                const negToShow = filteredNegative.slice(0, 2);
+                const posToShow = positiveItems.slice(0, 2);
+
+                const allToShow = [...negToShow, ...posToShow].slice(0, 2);
+                if (allToShow.length === 0) return null;
+
+                return allToShow.map((item, evidenceIndex) => (
                   <blockquote key={`${place.title || index}-${evidenceIndex}`} className="dash-evidence-quote">
                     <p>{item.text}</p>
                     <footer>
                       {item.rating ? `⭐ ${item.rating} sao` : "Không có rating"}
                       {item.negative_aspects?.length ? ` · tiêu cực: ${item.negative_aspects.map(aspectDisplayName).join(", ")}` : ""}
+                      {item.positive_aspects?.length > 0 && !item.negative_aspects?.length ? ` · tích cực: ${item.positive_aspects.map(aspectDisplayName).join(", ")}` : ""}
                     </footer>
                   </blockquote>
                 ));
