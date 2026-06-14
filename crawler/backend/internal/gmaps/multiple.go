@@ -46,6 +46,17 @@ func ParseSearchResults(raw []byte) ([]*Entry, error) {
 		entry.ReviewRating = getNthElementAndCast[float64](business, 4, 7)
 		entry.ReviewCount = int(getNthElementAndCast[float64](business, 4, 8))
 
+		entry.Latitude = getNthElementAndCast[float64](arr, 21)
+		entry.Longitude = getNthElementAndCast[float64](arr, 22)
+		if entry.Latitude == 0 && entry.Longitude == 0 {
+			entry.Latitude = getNthElementAndCast[float64](arr, 21, 2)
+			entry.Longitude = getNthElementAndCast[float64](arr, 21, 3)
+		}
+		if entry.Latitude == 0 && entry.Longitude == 0 {
+			entry.Latitude = getNthElementAndCast[float64](business, 21, 2)
+			entry.Longitude = getNthElementAndCast[float64](business, 21, 3)
+		}
+
 		entry.OpenHours = getHours(business)
 
 		entries = append(entries, &entry)

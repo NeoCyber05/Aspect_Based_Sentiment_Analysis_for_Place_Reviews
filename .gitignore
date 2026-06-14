@@ -11,5 +11,6 @@ crawler/backend/crawler/data/*.db-wal
 # Local dev tooling
 .agents/
 .codegraph/
+mcps/codegraph/
 .cursor/
 docs/

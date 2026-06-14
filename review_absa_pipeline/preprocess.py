@@ -4,6 +4,15 @@ import html
 import re
 import unicodedata
 from pathlib import Path
+from urllib.request import urlretrieve
+
+
+VNCORENLP_BASE_URL = "https://raw.githubusercontent.com/vncorenlp/VnCoreNLP/master"
+VNCORENLP_FILES = [
+    "VnCoreNLP-1.2.jar",
+    "models/wordsegmenter/vi-vocab",
+    "models/wordsegmenter/wordsegmenter.rdr",
+]
 
 
 class TextPreprocessor:
@@ -12,9 +21,11 @@ class TextPreprocessor:
         self,
         teencode_path: str | Path,
         use_word_segmentation: bool = False,
+        vncorenlp_dir: str | Path = "VnCoreNLP",
     ) -> None:
         self.teencode_path = Path(teencode_path)
         self.use_word_segmentation = use_word_segmentation
+        self.vncorenlp_dir = Path(vncorenlp_dir)
         self._acronym_map: dict[str, str] | None = None
         self._segmenter = None
 
@@ -56,9 +67,11 @@ class TextPreprocessor:
                 from vncorenlp import VnCoreNLP  # type: ignore
             except Exception:
                 return text
-            vncorenlp_jar = Path("VnCoreNLP") / "VnCoreNLP-1.2.jar"
-            if not vncorenlp_jar.exists():
+            try:
+                self._ensure_vncorenlp()
+            except Exception:
                 return text
+            vncorenlp_jar = self.vncorenlp_dir / "VnCoreNLP-1.2.jar"
             self._segmenter = VnCoreNLP(str(vncorenlp_jar), annotators="wseg", quiet=True)
 
         try:
@@ -66,6 +79,14 @@ class TextPreprocessor:
             return " ".join(token for sentence in sentences for token in sentence)
         except Exception:
             return text
+
+    def _ensure_vncorenlp(self) -> None:
+        for relative_path in VNCORENLP_FILES:
+            local_path = self.vncorenlp_dir / relative_path
+            if local_path.exists():
+                continue
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            urlretrieve(f"{VNCORENLP_BASE_URL}/{relative_path}", local_path)
 
     @staticmethod
     def _remove_unnecessary_characters(text: str) -> str:

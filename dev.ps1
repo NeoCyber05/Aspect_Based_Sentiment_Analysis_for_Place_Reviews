@@ -111,7 +111,6 @@ switch ($Command) {
         Write-Host "  Backend  : http://localhost:8090/api/health" -ForegroundColor White
         Write-Host "  Sentiment: http://localhost:8091/health" -ForegroundColor White
         Write-Host "----------------------------------------" -ForegroundColor Cyan
-        Write-Host "Ollama: needs to run separately at http://localhost:11434 (e.g., 'ollama serve')." -ForegroundColor Gray
         Write-Host "To stop all: .\dev.ps1 stop  (or Ctrl+C in each window)`n" -ForegroundColor Gray
         break
     }

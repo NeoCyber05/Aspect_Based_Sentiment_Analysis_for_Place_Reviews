@@ -25,6 +25,8 @@ type Entry struct {
 	Categories []string            `json:"categories"`
 	Category   string              `json:"category"`
 	OpenHours  map[string][]string `json:"open_hours"`
+	Latitude            float64                `json:"latitude"`
+	Longitude           float64                `json:"longitude"`
 	ReviewCount         int                    `json:"review_count"`
 	ReviewRating        float64                `json:"review_rating"`
 	ReviewsPerRating    map[int]int            `json:"reviews_per_rating"`
@@ -59,6 +61,8 @@ func (e *Entry) CsvHeaders() []string {
 		"review_count",
 		"review_rating",
 		"reviews_per_rating",
+		"latitude",
+		"longitude",
 		"user_reviews",
 		"user_reviews_extended",
 	}
@@ -79,6 +83,8 @@ func (e *Entry) CsvRow() []string {
 		stringify(e.ReviewCount),
 		stringify(e.ReviewRating),
 		stringify(e.ReviewsPerRating),
+		stringify(e.Latitude),
+		stringify(e.Longitude),
 		stringify(e.UserReviews),
 		stringify(e.UserReviewsExtended),
 	}
@@ -183,6 +189,16 @@ func EntryFromJSON(raw []byte, reviewCountOnly ...bool) (entry Entry, err error)
 	}
 
 	entry.OpenHours = getHours(darray)
+	entry.Latitude = getNthElementAndCast[float64](darray, 21, 2)
+	entry.Longitude = getNthElementAndCast[float64](darray, 21, 3)
+	if entry.Latitude == 0 && entry.Longitude == 0 {
+		entry.Latitude = getNthElementAndCast[float64](darray, 22)
+		entry.Longitude = getNthElementAndCast[float64](darray, 23)
+	}
+	if entry.Latitude == 0 && entry.Longitude == 0 {
+		entry.Latitude = getNthElementAndCast[float64](darray, 21, 0)
+		entry.Longitude = getNthElementAndCast[float64](darray, 21, 1)
+	}
 	entry.ReviewRating = getNthElementAndCast[float64](darray, 4, 7)
 
 	entry.ReviewsPerRating = map[int]int{

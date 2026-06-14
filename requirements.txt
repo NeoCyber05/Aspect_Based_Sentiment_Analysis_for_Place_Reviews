@@ -3,6 +3,7 @@ transformers
 safetensors
 sentencepiece
 huggingface_hub
+vncorenlp
 fastapi
 uvicorn
 joblib

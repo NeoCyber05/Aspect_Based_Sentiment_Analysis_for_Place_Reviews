@@ -13,17 +13,24 @@ DEFAULT_DOMAIN_MODEL_REPOS = {
     "hospital": "NeoCyber/m-e5-small-hosrev",
 }
 
+DEFAULT_DOMAIN_TEENCODE_PATHS = {
+    "restaurant": "training/teencode/res_teencode.txt",
+    "hotel": "training/teencode/hotel_teencode.txt",
+    "hospital": "training/teencode/hosRev_teencode.txt",
+}
+
 
 @dataclass
 class ModelManager:
     model_repos: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_DOMAIN_MODEL_REPOS))
     default_domain: str = "restaurant"
     teencode_path: str = "training/teencode/res_teencode.txt"
+    teencode_paths: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_DOMAIN_TEENCODE_PATHS))
     max_length: int = 256
     batch_size: int = 16
     use_text_preprocessing: bool = True
-    use_word_segmentation: bool = False
-    prefer_local_cache: bool = True
+    use_word_segmentation: bool = True
+    prefer_local_cache: bool = False
 
     def __post_init__(self) -> None:
         self._models: dict[str, "ABSAInferenceModel"] = {}
@@ -37,6 +44,10 @@ class ModelManager:
         resolved = self._resolve_domain(domain)
         return self.model_repos[resolved]
 
+    def teencode_path_for(self, domain: str) -> str:
+        resolved = self._resolve_domain(domain)
+        return self.teencode_paths.get(resolved, self.teencode_path)
+
     def get_model(self, domain: str) -> ABSAInferenceModel:
         from .model import ABSAInferenceConfig, ABSAInferenceModel
 
@@ -44,7 +55,7 @@ class ModelManager:
         if resolved not in self._models:
             cfg = ABSAInferenceConfig(
                 model_repo_id=self.model_repos[resolved],
-                teencode_path=self.teencode_path,
+                teencode_path=self.teencode_path_for(resolved),
                 max_length=self.max_length,
                 batch_size=self.batch_size,
                 use_text_preprocessing=self.use_text_preprocessing,

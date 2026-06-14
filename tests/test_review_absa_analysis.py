@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import joblib
 import pandas as pd
@@ -17,8 +21,11 @@ from review_absa_pipeline.aspect_metadata import enrich_aspect_row, translate_as
 from review_absa_pipeline.domain import DomainRoute, RuleBasedDomainRouter, SklearnDomainRouter
 from review_absa_pipeline.engine import AnalysisEngine
 from review_absa_pipeline.insights import build_analysis_result
+from review_absa_pipeline.model_manager import ModelManager
 from review_absa_pipeline.narrative import build_narrative_context, generate_template_narrative
 from review_absa_pipeline.pipeline import load_place_review_batches
+from review_absa_pipeline.preprocess import TextPreprocessor
+from review_absa_pipeline.run_from_csv import build_parser
 
 
 class FakeModelManager:
@@ -508,6 +515,101 @@ class ReviewAnalysisTests(unittest.TestCase):
         self.assertEqual(result["places"][0]["domain"]["domain"], "restaurant")
         self.assertEqual(result["places"][0]["domain"]["source"], "sklearn")
         self.assertEqual(result["model_repo_ids"]["restaurant"], "repo/restaurant")
+
+    def test_model_manager_uses_training_preprocess_settings_per_domain(self) -> None:
+        captured_configs = []
+
+        class FakeInferenceModel:
+            def __init__(self, cfg) -> None:
+                captured_configs.append(cfg)
+
+        manager = ModelManager(
+            model_repos={
+                "restaurant": "repo/restaurant",
+                "hotel": "repo/hotel",
+                "hospital": "repo/hospital",
+            }
+        )
+
+        with patch("review_absa_pipeline.model.ABSAInferenceModel", FakeInferenceModel):
+            manager.get_model("restaurant")
+            manager.get_model("hotel")
+            manager.get_model("hospital")
+
+        self.assertEqual(
+            [cfg.teencode_path for cfg in captured_configs],
+            [
+                "training/teencode/res_teencode.txt",
+                "training/teencode/hotel_teencode.txt",
+                "training/teencode/hosRev_teencode.txt",
+            ],
+        )
+        self.assertTrue(all(cfg.use_word_segmentation for cfg in captured_configs))
+        self.assertFalse(any(cfg.prefer_local_cache for cfg in captured_configs))
+
+    def test_run_from_csv_enables_training_word_segmentation_by_default(self) -> None:
+        parser = build_parser()
+
+        default_args = parser.parse_args(["--input-csv", "reviews.csv"])
+        disabled_args = parser.parse_args(
+            ["--input-csv", "reviews.csv", "--disable-word-segmentation"]
+        )
+
+        self.assertTrue(default_args.use_word_segmentation)
+        self.assertFalse(disabled_args.use_word_segmentation)
+
+    def test_text_preprocessor_downloads_vncorenlp_assets_when_segmentation_is_enabled(self) -> None:
+        tmp = Path(".test-vncorenlp-assets")
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir(exist_ok=True)
+        vncorenlp_dir = tmp / "VnCoreNLP"
+        downloaded_paths = []
+
+        class FakeVnCoreNLP:
+            def __init__(self, jar_path, annotators, quiet) -> None:
+                self.jar_path = Path(jar_path)
+                self.annotators = annotators
+                self.quiet = quiet
+
+            def tokenize(self, text: str):
+                return [[text.replace(" ", "_")]]
+
+        def fake_urlretrieve(url: str, local_path: str | Path):
+            del url
+            local_path = Path(local_path)
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_text("asset", encoding="utf-8")
+            downloaded_paths.append(local_path.relative_to(vncorenlp_dir).as_posix())
+            return str(local_path), None
+
+        fake_module = types.ModuleType("vncorenlp")
+        fake_module.VnCoreNLP = FakeVnCoreNLP
+        old_module = sys.modules.get("vncorenlp")
+        sys.modules["vncorenlp"] = fake_module
+        try:
+            preprocessor = TextPreprocessor(
+                teencode_path=tmp / "missing_teencode.txt",
+                use_word_segmentation=True,
+                vncorenlp_dir=vncorenlp_dir,
+            )
+            with patch("review_absa_pipeline.preprocess.urlretrieve", fake_urlretrieve):
+                segmented = preprocessor._word_segmentation("dịch vụ tốt")
+        finally:
+            if old_module is None:
+                sys.modules.pop("vncorenlp", None)
+            else:
+                sys.modules["vncorenlp"] = old_module
+            shutil.rmtree(tmp, ignore_errors=True)
+
+        self.assertEqual(segmented, "dịch_vụ_tốt")
+        self.assertEqual(
+            downloaded_paths,
+            [
+                "VnCoreNLP-1.2.jar",
+                "models/wordsegmenter/vi-vocab",
+                "models/wordsegmenter/wordsegmenter.rdr",
+            ],
+        )
 
     def test_analysis_result_enriches_display_metadata_and_marks_low_sample_alerts(self) -> None:
         place_result = {

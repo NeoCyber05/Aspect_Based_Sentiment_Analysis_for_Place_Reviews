@@ -25,8 +25,8 @@ class ABSAInferenceConfig:
     max_length: int = 256
     batch_size: int = 16
     use_text_preprocessing: bool = True
-    use_word_segmentation: bool = False
-    prefer_local_cache: bool = True
+    use_word_segmentation: bool = True
+    prefer_local_cache: bool = False
 
 
 def _from_pretrained_prefer_cache(loader, model_repo_id: str, prefer_local_cache: bool, **kwargs):

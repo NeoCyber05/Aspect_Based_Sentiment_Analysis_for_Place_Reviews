@@ -28,7 +28,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--disable-preprocess", action="store_true")
-    parser.add_argument("--use-word-segmentation", action="store_true")
+    segmentation_group = parser.add_mutually_exclusive_group()
+    segmentation_group.add_argument(
+        "--use-word-segmentation",
+        dest="use_word_segmentation",
+        action="store_true",
+        default=True,
+        help="Enable VnCoreNLP word segmentation before inference (default).",
+    )
+    segmentation_group.add_argument(
+        "--disable-word-segmentation",
+        dest="use_word_segmentation",
+        action="store_false",
+        help="Disable VnCoreNLP word segmentation before inference.",
+    )
     parser.add_argument(
         "--output-json",
         default="",
