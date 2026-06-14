@@ -2,13 +2,29 @@ from __future__ import annotations
 
 import csv
 import json
+import math
+import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+
 REVIEW_COLUMNS = ("user_review", "user_reviews_extended", "user_reviews")
 DESCRIPTION_KEYS = ("Description", "description", "Text", "text", "Review", "review")
+
+
+def _raise_csv_field_size_limit() -> None:
+    limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(limit)
+            return
+        except OverflowError:
+            limit = limit // 10
+
+
+_raise_csv_field_size_limit()
 
 
 @dataclass
@@ -29,6 +45,12 @@ class PlaceReviewBatch:
     category: str = ""
     address: str = ""
     reviews: list[ReviewRecord] = field(default_factory=list)
+    review_count: int | None = None
+    review_rating: float | None = None
+    reviews_per_rating: dict[str, int] = field(default_factory=dict)
+    open_hours: dict[str, Any] = field(default_factory=dict)
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 def _normalize_description(value: Any) -> str | None:
@@ -145,6 +167,46 @@ def _review_records_from_column(raw_value: Any, source_column: str) -> list[Revi
     return records
 
 
+def _parse_reviews_per_rating(value: Any) -> dict[str, int]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    result: dict[str, int] = {}
+    for k, v in parsed.items():
+        try:
+            result[str(k)] = int(float(v))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _parse_open_hours(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return dict(parsed)
+
+
+def _parse_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def load_place_review_batches(csv_path: str | Path) -> list[PlaceReviewBatch]:
     csv_path = Path(csv_path)
     results: list[PlaceReviewBatch] = []
@@ -170,6 +232,12 @@ def load_place_review_batches(csv_path: str | Path) -> list[PlaceReviewBatch]:
                     category=str(row.get("category", "")).strip(),
                     address=str(row.get("address", "")).strip(),
                     reviews=reviews,
+                    review_count=int(float(row.get("review_count") or 0)) or None,
+                    review_rating=_parse_float(row.get("review_rating")),
+                    reviews_per_rating=_parse_reviews_per_rating(row.get("reviews_per_rating", "")),
+                    open_hours=_parse_open_hours(row.get("open_hours", "")),
+                    latitude=_parse_float(row.get("latitude")),
+                    longitude=_parse_float(row.get("longitude")),
                 )
             )
     return results

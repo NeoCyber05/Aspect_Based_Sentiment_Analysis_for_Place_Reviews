@@ -1,0 +1,25 @@
+{
+  "name": "codegraph_explore",
+  "description": "PRIMARY TOOL — call FIRST for almost any question: how does X work, architecture, a bug, where/what is X, or surveying an area. Returns the verbatim source of the relevant symbols grouped by file in ONE capped call (Read-equivalent — do NOT re-open shown files). Query can be a natural-language question OR a bag of symbol/file names. Usually the ONLY call you need — answers without further search/node/Read/Grep.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Symbol names, file names, or short code terms to explore (e.g., \"AuthService loginUser session-manager\", \"GraphTraverser BFS impact traversal.ts\"). Use codegraph_search first to find relevant names."
+      },
+      "maxFiles": {
+        "type": "number",
+        "description": "Maximum number of files to include source code from (default: 12)",
+        "default": 12
+      },
+      "projectPath": {
+        "type": "string",
+        "description": "Path to a different project with .codegraph/ initialized. If omitted, uses current project. Use this to query other codebases."
+      }
+    },
+    "required": [
+      "query"
+    ]
+  }
+}

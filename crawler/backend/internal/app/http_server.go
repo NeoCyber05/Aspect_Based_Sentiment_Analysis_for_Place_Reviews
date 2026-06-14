@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,11 +18,54 @@ import (
 	"crawler/backend/internal/web"
 )
 
+func countCSVReviews(path string) (places int, reviews int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+
+	reader := csv.NewReader(f)
+	header, err := reader.Read()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	reviewCountIdx := -1
+	for i, col := range header {
+		if col == "review_count" {
+			reviewCountIdx = i
+			break
+		}
+	}
+
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+		if len(row) == 0 || row[0] == "" {
+			continue
+		}
+		places++
+		if reviewCountIdx >= 0 && reviewCountIdx < len(row) {
+			if n, err := strconv.Atoi(row[reviewCountIdx]); err == nil {
+				reviews += n
+			}
+		}
+	}
+	return places, reviews, nil
+}
+
 type httpServer struct {
 	svc           *web.Service
 	srv           *http.Server
 	analyzer      analysisRunner
 	analysisStore *analysisStore
+	dataFolder    string
 }
 
 func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
@@ -30,6 +75,7 @@ func newHTTPServer(svc *web.Service, cfg *Config) *httpServer {
 		svc:           svc,
 		analyzer:      newReviewAnalyzer(cfg),
 		analysisStore: store,
+		dataFolder:    cfg.DataFolder,
 		srv: &http.Server{
 			Addr:              cfg.Addr,
 			Handler:           withCORS(handler),
@@ -143,10 +189,23 @@ func (s *httpServer) listJobs(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		ans = append(ans, toJobResponse(item, status))
+		resp := toJobResponse(item, status)
+		if item.Status == web.StatusWorking {
+			resp.CrawlProgress = s.readCrawlProgress(item)
+		}
+		ans = append(ans, resp)
 	}
 
 	writeJSON(w, http.StatusOK, ans)
+}
+
+func (s *httpServer) readCrawlProgress(job web.Job) *crawlProgress {
+	path := filepath.Join(s.dataFolder, web.CsvFileName(job))
+	places, reviews, err := countCSVReviews(path)
+	if err != nil {
+		return nil
+	}
+	return &crawlProgress{PlacesCrawled: places, ReviewsCrawled: reviews}
 }
 
 func (s *httpServer) jobByID(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +228,11 @@ func (s *httpServer) jobByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusOK, toJobResponse(job, status))
+		resp := toJobResponse(job, status)
+		if job.Status == web.StatusWorking {
+			resp.CrawlProgress = s.readCrawlProgress(job)
+		}
+		writeJSON(w, http.StatusOK, resp)
 	case http.MethodDelete:
 		if err := s.svc.Delete(r.Context(), id); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())

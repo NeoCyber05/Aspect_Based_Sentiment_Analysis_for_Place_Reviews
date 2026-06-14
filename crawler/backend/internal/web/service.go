@@ -37,14 +37,16 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("invalid file name")
 	}
 
-	datapath := filepath.Join(s.dataFolder, id+".csv")
-
-	if _, err := os.Stat(datapath); err == nil {
-		if err := os.Remove(datapath); err != nil {
-			return err
+	job, err := s.repo.Get(ctx, id)
+	if err == nil {
+		datapath := filepath.Join(s.dataFolder, CsvFileName(job))
+		if _, statErr := os.Stat(datapath); statErr == nil {
+			if rmErr := os.Remove(datapath); rmErr != nil {
+				return rmErr
+			}
+		} else if !os.IsNotExist(statErr) {
+			return statErr
 		}
-	} else if !os.IsNotExist(err) {
-		return err
 	}
 
 	return s.repo.Delete(ctx, id)
@@ -72,7 +74,7 @@ func (s *Service) GetCSV(ctx context.Context, id string) (string, error) {
 		return "", ErrCSVNotReady
 	}
 
-	datapath := filepath.Join(s.dataFolder, id+".csv")
+	datapath := filepath.Join(s.dataFolder, CsvFileName(job))
 
 	info, err := os.Stat(datapath)
 	if os.IsNotExist(err) {
@@ -86,4 +88,27 @@ func (s *Service) GetCSV(ctx context.Context, id string) (string, error) {
 	}
 
 	return datapath, nil
+}
+
+func CsvFileName(job Job) string {
+	name := sanitizeFileName(job.Name)
+	return name + "_" + job.ID[:8] + ".csv"
+}
+
+func sanitizeFileName(name string) string {
+	if name == "" {
+		return "unnamed"
+	}
+
+	replacer := strings.NewReplacer(
+		" ", "_", "\t", "_", "\n", "_", "\r", "_",
+		"<", "", ">", "", ":", "", "\"", "",
+		"/", "", "\\", "", "|", "", "?", "", "*", "",
+	)
+	name = replacer.Replace(name)
+	name = strings.Trim(name, ". ")
+	if name == "" {
+		return "unnamed"
+	}
+	return name
 }

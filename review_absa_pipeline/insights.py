@@ -154,6 +154,46 @@ def _dominant_domain(place_results: list[dict[str, Any]]) -> str:
     return sorted(counts.items(), key=lambda item: item[1], reverse=True)[0][0]
 
 
+def _global_review_rating_mean(place_results: list[dict[str, Any]]) -> float:
+    values = [
+        float(place["review_rating"])
+        for place in place_results
+        if place.get("review_rating") is not None and float(place["review_rating"]) > 0
+    ]
+    if not values:
+        return 3.5
+    return sum(values) / len(values)
+
+
+def _rating_distribution_std(reviews_per_rating: dict[str, int]) -> float:
+    total = sum(reviews_per_rating.values())
+    if total == 0:
+        return 0.0
+    mean = sum(int(rating) * count for rating, count in reviews_per_rating.items()) / total
+    variance = sum(count * (int(rating) - mean) ** 2 for rating, count in reviews_per_rating.items()) / total
+    return variance ** 0.5
+
+
+def _adjusted_avg_rating(
+    review_rating: float | None,
+    review_count: int | None,
+    reviews_per_rating: dict[str, int],
+    global_mean: float,
+    prior_count: int = 20,
+) -> float | None:
+    if review_rating is None or review_count is None or review_count <= 0:
+        return None
+
+    # Bayesian average to shrink low-review places toward global mean
+    smoothed = (review_rating * review_count + global_mean * prior_count) / (review_count + prior_count)
+
+    # Controversy penalty: high variance in reviews_per_rating lowers the score slightly
+    std = _rating_distribution_std(reviews_per_rating)
+    penalty = min(0.3, 0.12 * max(0.0, std - 0.8))
+
+    return round(max(0.0, min(5.0, smoothed - penalty)), 2)
+
+
 def _alerts(global_aspects: list[dict[str, Any]], limit: int = 8) -> list[dict[str, Any]]:
     candidates = [
         aspect
@@ -198,6 +238,7 @@ def build_analysis_result(
 ) -> dict[str, Any]:
     all_predictions: list[dict[str, str | None]] = []
     places: list[dict[str, Any]] = []
+    global_review_mean = _global_review_rating_mean(place_results)
 
     for place in place_results:
         reviews = place.get("reviews", [])
@@ -232,18 +273,46 @@ def build_analysis_result(
                 "top_positive_aspects": top_positive,
                 "top_negative_aspects": top_negative,
                 "evidence": _place_evidence(reviews),
+                "review_count": place.get("review_count"),
+                "review_rating": place.get("review_rating"),
+                "reviews_per_rating": place.get("reviews_per_rating", {}),
+                "open_hours": place.get("open_hours", {}),
+                "latitude": place.get("latitude"),
+                "longitude": place.get("longitude"),
+                "adjusted_avg_rating": _adjusted_avg_rating(
+                    place.get("review_rating"),
+                    place.get("review_count"),
+                    place.get("reviews_per_rating", {}),
+                    global_review_mean,
+                ),
             }
         )
 
     global_summary = summarize_aspects(all_predictions)
     global_domain = _dominant_domain(place_results)
     global_aspects = [enrich_aspect_row(item, domain=global_domain) for item in aspect_rows(global_summary)]
+    adjusted_ratings = [p["adjusted_avg_rating"] for p in places if p["adjusted_avg_rating"] is not None]
+    global_adjusted_avg = round(sum(adjusted_ratings) / len(adjusted_ratings), 2) if adjusted_ratings else 0.0
+    total_review_count = sum(p["review_count"] or 0 for p in places)
+
+    # Sort places by adjusted average rating descending for ranking
+    places.sort(
+        key=lambda p: (
+            p["adjusted_avg_rating"] if p["adjusted_avg_rating"] is not None else 0,
+            p["review_count"] or 0,
+        ),
+        reverse=True,
+    )
+
     return {
         "job_id": job_id,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "model_repo_ids": model_repo_ids,
         "place_count": len(places),
         "description_count": len(all_predictions),
+        "total_review_count": total_review_count,
+        "global_review_rating_mean": round(global_review_mean, 2),
+        "global_adjusted_avg_rating": global_adjusted_avg,
         "overall": summarize_overall(global_summary),
         "domain_summary": _domain_summary(place_results),
         "aspect_summary": global_summary,

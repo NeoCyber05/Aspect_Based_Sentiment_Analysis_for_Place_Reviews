@@ -165,6 +165,15 @@ class SklearnDomainRouter:
             features = self._build_features(place)
             predicted = model.predict(features)
             domain = str(predicted[0]) if len(predicted) else self.fallback.route(place).domain
+            # Temporarily hide university domain — fall back to rule-based router
+            if domain == "university":
+                route = self.fallback.route(place)
+                return DomainRoute(
+                    domain=route.domain,
+                    confidence=route.confidence,
+                    source="sklearn_university_disabled",
+                    fallback=True,
+                )
             confidence = self._confidence_from_model(model, features, domain)
             return DomainRoute(
                 domain=domain,

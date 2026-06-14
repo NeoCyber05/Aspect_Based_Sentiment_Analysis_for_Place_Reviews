@@ -6,20 +6,6 @@ Aspect-Based Sentiment Analysis for place reviews — crawl, analyze, visualize.
 
 ![Go](https://img.shields.io/badge/Go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-%23009688.svg?style=for-the-badge&logo=FastAPI&logoColor=white) ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361dafb) ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white) ![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
 
-## Quick Start (Docker)
-
-```bash
-docker compose up -d
-```
-
-Open http://localhost:5173
-
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| Go API | http://localhost:8090/api/health |
-| Python ABSA | http://localhost:8091/health |
-
 ## Quick Start
 
 Hot-reload development without building Docker images. Requirements: Python virtual environment, Go, Node.js.
@@ -63,19 +49,16 @@ pip install -r requirements.txt
 python load_hf_model.py --repo-id NeoCyber/m-e5-small-vlsp2018-hotel --text "Phòng sạch sẽ, nhân viên thân thiện"
 ```
 
-## Optional: Ollama Narrative Generation
+## Run Docker
 
-The Python ABSA service supports AI-generated Vietnamese narratives alongside ABSA metrics using a local Ollama instance. When enabled, instead of using static template-based summaries, the service sends structured ABSA metrics as context to Ollama to generate rich, natural language summaries (including positive strengths, negative issues, recommended actions, and sample size caveats).
+```bash
+docker compose up -d
+```
 
-If Ollama is unavailable, times out, or encounters errors, the pipeline automatically falls back to the static template-based generator to ensure reliability.
+Open http://localhost:5173
 
-### How to Setup and Configure
-
-1. **Install Ollama**: Make sure Ollama is installed and running on your local machine.
-2. **Download Model**: Pull your preferred LLM model (e.g. `gemma4:e4b` or `qwen2.5:3b`) by running:
-   ```bash
-   ollama pull gemma4:e4b
-   ```
-3. **Set Environment Variables**: Configure the following environment variables before running your services:
-   - `ABSA_OLLAMA_URL`: The Ollama API endpoint (defaults to `http://localhost:11434` for native run. For Docker container setups, use `http://host.docker.internal:11434` to communicate with the host machine).
-   - `ABSA_OLLAMA_MODEL`: The name of the pulled model (defaults to `gemma4:e4b`).
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Go API | http://localhost:8090/api/health |
+| Python ABSA | http://localhost:8091/health |

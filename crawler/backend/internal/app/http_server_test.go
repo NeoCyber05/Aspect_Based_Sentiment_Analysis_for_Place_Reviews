@@ -108,15 +108,16 @@ func TestDownloadCSV(t *testing.T) {
 		t.Fatalf("failed to decode create response: %v", err)
 	}
 
-	csvPath := filepath.Join(dataDir, createOut.ID+".csv")
-	if err := os.WriteFile(csvPath, []byte("name,address\nshop,hn\n"), 0o600); err != nil {
-		t.Fatalf("failed to write csv fixture: %v", err)
-	}
-
 	job, err := server.svc.Get(context.Background(), createOut.ID)
 	if err != nil {
 		t.Fatalf("failed to load created job: %v", err)
 	}
+
+	csvPath := filepath.Join(dataDir, web.CsvFileName(job))
+	if err := os.WriteFile(csvPath, []byte("name,address\nshop,hn\n"), 0o600); err != nil {
+		t.Fatalf("failed to write csv fixture: %v", err)
+	}
+
 	job.Status = web.StatusOK
 	if err := server.svc.Update(context.Background(), &job); err != nil {
 		t.Fatalf("failed to update job status: %v", err)
@@ -161,15 +162,16 @@ func TestDownloadCSVRejectsEmptyFile(t *testing.T) {
 		t.Fatalf("failed to decode create response: %v", err)
 	}
 
-	csvPath := filepath.Join(dataDir, createOut.ID+".csv")
-	if err := os.WriteFile(csvPath, nil, 0o600); err != nil {
-		t.Fatalf("failed to write csv fixture: %v", err)
-	}
-
 	job, err := server.svc.Get(context.Background(), createOut.ID)
 	if err != nil {
 		t.Fatalf("failed to load created job: %v", err)
 	}
+
+	csvPath := filepath.Join(dataDir, web.CsvFileName(job))
+	if err := os.WriteFile(csvPath, nil, 0o600); err != nil {
+		t.Fatalf("failed to write csv fixture: %v", err)
+	}
+
 	job.Status = web.StatusOK
 	if err := server.svc.Update(context.Background(), &job); err != nil {
 		t.Fatalf("failed to update job status: %v", err)

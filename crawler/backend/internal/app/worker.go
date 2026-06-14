@@ -70,7 +70,7 @@ func (w *worker) scrapeJob(ctx context.Context, job *web.Job) error {
 		return err
 	}
 
-	outpath := filepath.Join(w.cfg.DataFolder, job.ID+".csv")
+	outpath := filepath.Join(w.cfg.DataFolder, web.CsvFileName(*job))
 	outfile, err := os.Create(outpath)
 	if err != nil {
 		return err
@@ -222,7 +222,11 @@ func (w *worker) setupMate(writer io.Writer, job *web.Job) (crawlMate, error) {
 
 	return &localMate{
 		concurrency:      w.cfg.Concurrency,
-		exitOnInactivity: 3 * time.Minute,
+		// Worker-owned context timeouts and exiter completion are the reliable
+		// lifecycle controls here. ScrapeMate's inactivity watchdog treats the
+		// zero last-activity timestamp as stale before a long first Maps job can
+		// finish and enqueue place-detail jobs.
+		exitOnInactivity: 0,
 		fetcher:          httpFetcher,
 		writer:           csvWriter,
 	}, nil

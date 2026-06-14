@@ -366,6 +366,40 @@ class ReviewAnalysisTests(unittest.TestCase):
         self.assertEqual(batches[0].reviews[0].when, "2026-01-02")
         self.assertEqual(batches[0].reviews[0].reviewer_name, "Anh")
 
+    def test_loader_accepts_large_review_json_fields_from_crawler(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "large_reviews.csv"
+            long_description = "dịch vụ tốt " * 15000
+            row = {
+                "input_id": "place-large",
+                "title": "Cafe Large",
+                "category": "Cafe",
+                "address": "Ha Noi",
+                "user_reviews": "",
+                "user_reviews_extended": json.dumps(
+                    [
+                        {
+                            "Name": "Anh",
+                            "Rating": 5,
+                            "Description": long_description,
+                            "When": "2026-06-14",
+                        }
+                    ],
+                    ensure_ascii=False,
+                ),
+            }
+            with csv_path.open("w", encoding="utf-8", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=list(row))
+                writer.writeheader()
+                writer.writerow(row)
+
+            batches = load_place_review_batches(csv_path)
+
+        self.assertEqual(len(batches), 1)
+        self.assertEqual(batches[0].input_id, "place-large")
+        self.assertEqual(batches[0].source_column, "user_reviews_extended")
+        self.assertEqual(batches[0].reviews[0].text, long_description.strip())
+
     def test_rule_based_router_returns_domain_confidence_and_fallback_flag(self) -> None:
         router = RuleBasedDomainRouter(default_domain="restaurant")
 

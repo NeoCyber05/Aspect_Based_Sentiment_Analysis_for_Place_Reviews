@@ -1,0 +1,33 @@
+{
+  "name": "codegraph_node",
+  "description": "SECONDARY (after codegraph_explore): get ONE symbol in full — its location, signature, callers/callees trail, and verbatim body (includeCode=true). When the name is AMBIGUOUS (an overloaded method, or the same method name on different types), it returns EVERY matching definition's full body in a single call — so you never need to Read a file to find the specific overload you want. For a heavily-overloaded name, pass `file` (and/or `line`) to pin the exact definition — e.g. the `file:line` a trail or another tool already showed you. Reach for this when explore trimmed a body you need. Use codegraph_explore for several related symbols or the full flow.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Name of the symbol to get details for"
+      },
+      "includeCode": {
+        "type": "boolean",
+        "description": "Include full source code (default: false to minimize context)",
+        "default": false
+      },
+      "file": {
+        "type": "string",
+        "description": "Optional: disambiguate an overloaded name to the definition in this file (path or basename, e.g. \"harness.rs\")."
+      },
+      "line": {
+        "type": "number",
+        "description": "Optional: disambiguate to the definition at/around this line (use with the file:line a trail showed you)."
+      },
+      "projectPath": {
+        "type": "string",
+        "description": "Path to a different project with .codegraph/ initialized. If omitted, uses current project. Use this to query other codebases."
+      }
+    },
+    "required": [
+      "symbol"
+    ]
+  }
+}

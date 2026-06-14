@@ -58,3 +58,12 @@ class ModelManager:
         if not reviews:
             return []
         return self.get_model(domain).predict(reviews)
+
+    def preload(self) -> None:
+        """Eagerly load all configured domain models into memory."""
+        for domain in self.model_repos:
+            self.get_model(domain)
+
+    @property
+    def loaded_domains(self) -> list[str]:
+        return list(self._models.keys())

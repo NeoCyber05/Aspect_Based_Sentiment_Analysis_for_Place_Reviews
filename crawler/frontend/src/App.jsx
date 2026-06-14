@@ -6,27 +6,6 @@ import { AnalysisDashboard } from "./components/AnalysisDashboard";
 
 const vietMapApiKey = import.meta.env.VITE_VIETMAP_API_KEY?.trim() || "";
 const vietMapApiBase = "https://maps.vietmap.vn/api";
-const vietMapStyleBase = "https://maps.vietmap.vn/maps/styles";
-
-function appendVietMapApiKey(rawUrl, apiKey) {
-  if (!apiKey || !rawUrl.startsWith("https://maps.vietmap.vn/")) {
-    return rawUrl;
-  }
-
-  try {
-    const url = new URL(rawUrl);
-    if (!url.searchParams.has("apikey")) {
-      url.searchParams.set("apikey", apiKey);
-    }
-    return url.toString();
-  } catch {
-    return rawUrl;
-  }
-}
-
-function vietMapStyleUrl(apiKey, style = "tm") {
-  return appendVietMapApiKey(`${vietMapStyleBase}/${style}/style.json`, apiKey);
-}
 
 function rasterFallbackStyle() {
   return {
@@ -49,31 +28,16 @@ function rasterFallbackStyle() {
   };
 }
 
-function isMapResourceError(message) {
-  const normalized = String(message || "").toLowerCase();
-  return (
-    normalized.includes("failed to fetch") ||
-    normalized.includes("401") ||
-    normalized.includes("403") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("forbidden") ||
-    normalized.includes("tile") ||
-    normalized.includes("source")
-  );
-}
-
 const initialForm = {
   name: "",
   keywordsText: "",
   lang: "vi",
-  depth: 10,
-  zoom: 15,
   radius: 10000,
   maxPlaces: 30,
   maxTimeSeconds: 600,
   urlMode: false,
-  lat: "",
-  lon: "",
+  lat: "21.004781",
+  lon: "105.845582",
   crawlMode: "full"
 };
 
@@ -160,6 +124,7 @@ function formatCoordinate(value) {
 }
 
 function parseCoordinate(value) {
+  if (typeof value === "string" && value.trim() === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -217,9 +182,42 @@ async function fetchVietMap(path, params, signal) {
   return data;
 }
 
+const CRAWL_CIRCLE_SOURCE = "crawl-radius";
+const EARTH_RADIUS_M = 6378137;
 
+function formatRadius(meters) {
+  const value = Number(meters) || 0;
+  if (value >= 1000) {
+    const km = value / 1000;
+    return `${Number.isInteger(km) ? km : km.toFixed(1)} km`;
+  }
+  return `${Math.round(value)} m`;
+}
 
-function PlacePicker({ apiKey, onPick, selectedLocation }) {
+// Xấp xỉ hình tròn (bán kính theo mét) thành polygon GeoJSON quanh tâm lat/lng.
+function circlePolygon(lat, lng, radiusMeters, points = 72) {
+  const coords = [];
+  const latRad = (lat * Math.PI) / 180;
+  for (let i = 0; i <= points; i += 1) {
+    const theta = (i / points) * 2 * Math.PI;
+    const dLng = ((radiusMeters * Math.cos(theta)) / (EARTH_RADIUS_M * Math.cos(latRad))) * (180 / Math.PI);
+    const dLat = ((radiusMeters * Math.sin(theta)) / EARTH_RADIUS_M) * (180 / Math.PI);
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] } };
+}
+
+function circleBounds(lat, lng, radiusMeters) {
+  const latRad = (lat * Math.PI) / 180;
+  const dLat = (radiusMeters / EARTH_RADIUS_M) * (180 / Math.PI);
+  const dLng = (radiusMeters / (EARTH_RADIUS_M * Math.cos(latRad))) * (180 / Math.PI);
+  return [
+    [lng - dLng, lat - dLat],
+    [lng + dLng, lat + dLat]
+  ];
+}
+
+function PlacePicker({ apiKey, onPick, selectedLocation, radius }) {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -230,6 +228,7 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [pickStatus, setPickStatus] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     onPickRef.current = onPick;
@@ -254,6 +253,27 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
     }
   }, []);
 
+  const ensureCircleLayers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || map.getSource(CRAWL_CIRCLE_SOURCE)) return;
+    map.addSource(CRAWL_CIRCLE_SOURCE, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] }
+    });
+    map.addLayer({
+      id: "crawl-radius-fill",
+      type: "fill",
+      source: CRAWL_CIRCLE_SOURCE,
+      paint: { "fill-color": "#0284c7", "fill-opacity": 0.12 }
+    });
+    map.addLayer({
+      id: "crawl-radius-line",
+      type: "line",
+      source: CRAWL_CIRCLE_SOURCE,
+      paint: { "line-color": "#0284c7", "line-width": 2, "line-dasharray": [2, 1] }
+    });
+  }, []);
+
   useEffect(() => {
     if (!apiKey) {
       setMapState("missing-key");
@@ -264,23 +284,20 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
 
     let cancelled = false;
     let ready = false;
-    let usingFallbackStyle = false;
     let lastMapError = "";
-    let tileFallbackTimer = null;
     setMapState("loading");
     setPickStatus("");
 
+    // VietMap tile (Web SDK) bị giới hạn theo plan/quota của API key (HTTP 423
+    // "Your request is limited"), nên dùng nền OpenStreetMap làm chính. VietMap
+    // vẫn được dùng cho tìm kiếm/geocode qua REST API (fetchVietMap).
     const start = selectedLocation || defaultMapCenter;
     const map = new vietmapgl.Map({
       container: mapElementRef.current,
-      style: vietMapStyleUrl(apiKey),
+      style: rasterFallbackStyle(),
       center: [start.lng, start.lat],
       zoom: selectedLocation ? 16 : 15,
-      attributionControl: true,
-      vietmapLogo: true,
-      transformRequest: (url) => ({
-        url: appendVietMapApiKey(url, apiKey)
-      })
+      attributionControl: true
     });
 
     mapRef.current = map;
@@ -289,61 +306,25 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
     const readyTimer = window.setTimeout(() => {
       if (cancelled || ready) return;
       setMapState("error");
-      setPickStatus(lastMapError || "Không tải được style bản đồ VietMap.");
+      setPickStatus(lastMapError || "Không tải được nền bản đồ OpenStreetMap.");
     }, 15000);
-
-    const clearTileFallbackTimer = () => {
-      if (!tileFallbackTimer) return;
-      window.clearTimeout(tileFallbackTimer);
-      tileFallbackTimer = null;
-    };
-
-    const switchToFallbackStyle = () => {
-      if (cancelled || usingFallbackStyle || !mapRef.current) return;
-
-      usingFallbackStyle = true;
-      ready = true;
-      clearTileFallbackTimer();
-      window.clearTimeout(readyTimer);
-      setMapState("ready");
-      setPickStatus("Đang hiển thị nền bản đồ dự phòng vì tile VietMap chưa tải được.");
-      mapRef.current.setStyle(rasterFallbackStyle());
-      window.requestAnimationFrame(() => mapRef.current?.resize());
-    };
 
     const markReady = () => {
       if (cancelled || ready) return;
       ready = true;
       window.clearTimeout(readyTimer);
       setMapState("ready");
+      ensureCircleLayers();
       window.requestAnimationFrame(() => map.resize());
       if (selectedLocation) {
         placeMarker(selectedLocation.lat, selectedLocation.lng);
       }
-
-      tileFallbackTimer = window.setTimeout(() => {
-        if (cancelled || usingFallbackStyle) return;
-        if (typeof map.areTilesLoaded === "function" && !map.areTilesLoaded()) {
-          switchToFallbackStyle();
-        }
-      }, 3500);
     };
 
     const handleError = (event) => {
-      if (cancelled) return;
+      if (cancelled || ready) return;
       lastMapError = event?.error?.message || "Một tài nguyên bản đồ chưa tải được.";
-      if (isMapResourceError(lastMapError)) {
-        switchToFallbackStyle();
-      } else if (!usingFallbackStyle) {
-        setPickStatus(`Một số tài nguyên bản đồ chưa tải được: ${lastMapError}`);
-      }
-    };
-
-    const handleIdle = () => {
-      if (cancelled || usingFallbackStyle) return;
-      if (typeof map.areTilesLoaded === "function" && map.areTilesLoaded()) {
-        clearTileFallbackTimer();
-      }
+      setPickStatus(`Một số tài nguyên bản đồ chưa tải được: ${lastMapError}`);
     };
 
     const handleClick = async (event) => {
@@ -381,24 +362,21 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
     map.on("styledata", markReady);
     map.on("load", markReady);
     map.on("error", handleError);
-    map.on("idle", handleIdle);
     map.on("click", handleClick);
 
     return () => {
       cancelled = true;
       window.clearTimeout(readyTimer);
-      clearTileFallbackTimer();
       markerRef.current?.remove();
       markerRef.current = null;
       map.off("styledata", markReady);
       map.off("load", markReady);
       map.off("error", handleError);
-      map.off("idle", handleIdle);
       map.off("click", handleClick);
       map.remove();
       mapRef.current = null;
     };
-  }, [apiKey, placeMarker]);
+  }, [apiKey, placeMarker, ensureCircleLayers]);
 
   useEffect(() => {
     if (!selectedLocation) {
@@ -409,6 +387,37 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
 
     placeMarker(selectedLocation.lat, selectedLocation.lng);
   }, [placeMarker, selectedLocation]);
+
+  // Cập nhật dữ liệu vòng tròn (polygon) khi tâm hoặc bán kính thay đổi.
+  // Không gọi fitBounds ở đây để tránh zoom map mỗi khi chỉnh radius (sẽ khiến vòng tròn
+  // lúc nào cũng "rất lớn" trên màn hình vì viewport luôn được fit vừa khít).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapState !== "ready") return;
+    ensureCircleLayers();
+    const source = map.getSource(CRAWL_CIRCLE_SOURCE);
+    if (!source) return;
+
+    if (!selectedLocation || !(radius > 0)) {
+      source.setData({ type: "FeatureCollection", features: [] });
+      return;
+    }
+
+    const { lat, lng } = selectedLocation;
+    source.setData({ type: "FeatureCollection", features: [circlePolygon(lat, lng, radius)] });
+  }, [selectedLocation, radius, mapState, ensureCircleLayers]);
+
+  // Chỉ fitBounds (zoom/pan để vừa khung vòng tròn) khi thay đổi vị trí chọn (lần pick mới).
+  // Không phụ thuộc vào radius để người dùng có thể chỉnh bán kính và thấy kích thước vòng tròn
+  // thay đổi tương đối trên bản đồ ở mức zoom hiện tại.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapState !== "ready") return;
+    if (!selectedLocation || !(radius > 0)) return;
+
+    const { lat, lng } = selectedLocation;
+    map.fitBounds(circleBounds(lat, lng, radius), { padding: 48, maxZoom: 16, duration: 600 });
+  }, [selectedLocation, mapState]);
 
   useEffect(() => {
     const text = query.trim();
@@ -455,6 +464,33 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
     };
   }, [apiKey, query]);
 
+  useEffect(() => {
+    if (!isExpanded) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isExpanded]);
+
+  useEffect(() => {
+    if (!mapRef.current || mapState !== "ready") return undefined;
+
+    const map = mapRef.current;
+    const timer = window.setTimeout(() => map.resize(), 80);
+    return () => window.clearTimeout(timer);
+  }, [isExpanded, mapState]);
+
   async function chooseSuggestion(suggestion) {
     const fallbackName = getLocationName(suggestion) || "Địa điểm đã chọn";
     const refid = getRefID(suggestion);
@@ -491,21 +527,44 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
   }
 
   return (
-    <section className="panel map-panel" aria-label="Chọn địa điểm trên bản đồ">
+    <>
+      {isExpanded && (
+        <div
+          className="map-expanded-backdrop"
+          onClick={() => setIsExpanded(false)}
+          aria-hidden="true"
+        />
+      )}
+      <section
+        className={`panel map-panel${isExpanded ? " map-panel--expanded" : ""}`}
+        aria-label="Chọn địa điểm trên bản đồ"
+      >
       <div className="panel-heading">
         <div>
           <p className="eyebrow">VietMap</p>
           <h2>Chọn địa điểm trên bản đồ</h2>
         </div>
-        <span className={`map-state ${mapState}`}>
-          {mapState === "ready"
-            ? "Sẵn sàng"
-            : mapState === "loading"
-              ? "Đang tải"
-              : mapState === "error"
-                ? "Lỗi"
-                : "Cần cấu hình"}
-        </span>
+        <div className="map-panel-actions">
+          <button
+            type="button"
+            className="map-expand-button"
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+            disabled={mapState !== "ready"}
+            aria-label={isExpanded ? "Thu nhỏ bản đồ" : "Phóng to bản đồ"}
+            title={isExpanded ? "Thu nhỏ bản đồ (Esc)" : "Phóng to bản đồ"}
+          >
+            {isExpanded ? "Thu nhỏ" : "Phóng to"}
+          </button>
+          <span className={`map-state ${mapState}`}>
+            {mapState === "ready"
+              ? "Sẵn sàng"
+              : mapState === "loading"
+                ? "Đang tải"
+                : mapState === "error"
+                  ? "Lỗi"
+                  : "Cần cấu hình"}
+          </span>
+        </div>
       </div>
 
       <div className="map-search">
@@ -551,6 +610,9 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
               <span>
                 {formatCoordinate(selectedLocation.lat)}, {formatCoordinate(selectedLocation.lng)}
               </span>
+              {radius > 0 && (
+                <span className="map-scope-radius">Bán kính cào: {formatRadius(radius)}</span>
+              )}
             </div>
           </div>
         )}
@@ -578,38 +640,10 @@ function PlacePicker({ apiKey, onPick, selectedLocation }) {
         <span>
           {pickStatus || "Tìm địa điểm bằng thanh tìm kiếm hoặc click trực tiếp lên bản đồ để lấy tọa độ và địa chỉ."}
         </span>
+        {isExpanded && <span className="map-expanded-hint">Nhấn Esc hoặc Thu nhỏ để quay lại.</span>}
       </div>
     </section>
-  );
-}
-
-function SummaryMetrics({ jobs, completedJobs, analysisReadyJobs, workingJobs }) {
-  const failedJobs = jobs.filter((job) => job.status === "failed").length;
-  const pendingAnalysis = completedJobs.filter((job) => (job.analysis_status || "pending") !== "ok").length;
-
-  return (
-    <section className="metric-strip" aria-label="Tổng quan dữ liệu và phân tích">
-      <article>
-        <span>Số job đã cào</span>
-        <strong>{jobs.length}</strong>
-        <small>{workingJobs.length} đang xử lý</small>
-      </article>
-      <article>
-        <span>Crawl thành công</span>
-        <strong>{completedJobs.length}</strong>
-        <small>{failedJobs} cào thất bại</small>
-      </article>
-      <article>
-        <span>Đã phân tích</span>
-        <strong>{analysisReadyJobs.length}</strong>
-        <small>{pendingAnalysis} job chờ phân tích</small>
-      </article>
-      <article>
-        <span>Luồng xử lý</span>
-        <strong>Thu thập → Phân tích</strong>
-        <small>Cảm xúc theo khía cạnh</small>
-      </article>
-    </section>
+    </>
   );
 }
 
@@ -634,10 +668,13 @@ function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, active
   const pendingCount = jobs.length - readyCount;
 
   return (
-    <section className="panel analysis-queue">
+    <section className="panel analysis-queue analysis-queue--full">
       <div className="aq-header">
         <div className="aq-title-row">
-          <span className="aq-title">Chọn job để xem kết quả</span>
+          <div>
+            <span className="aq-title">Khu vực khảo sát đã cào</span>
+            <span className="aq-subtitle">Ấn vào một khu vực để mở bảng phân tích ABSA.</span>
+          </div>
           <span className="job-count">{jobs.length}</span>
         </div>
 
@@ -646,7 +683,7 @@ function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, active
           <input
             className="aq-search"
             type="text"
-            placeholder="Tìm theo tên, từ khóa..."
+            placeholder="Tìm theo tên khu vực, từ khóa..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -682,12 +719,12 @@ function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, active
         </div>
       </div>
 
-      <div className="aq-list">
+      <div className="aq-list aq-list--grid">
         {filtered.length === 0 ? (
           <p className="aq-empty">
             {jobs.length === 0
-              ? "Chưa có job nào. Hãy tạo job thu thập dữ liệu trước."
-              : "Không tìm thấy job phù hợp."}
+              ? "Chưa có khu vực khảo sát nào. Hãy thu thập dữ liệu trước."
+              : "Không tìm thấy khu vực phù hợp."}
           </p>
         ) : (
           filtered.map((job) => {
@@ -696,12 +733,24 @@ function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, active
             const analysisReady = analysisStatus === "ok";
             const analysisWorking = analysisStatus === "working";
             const isActive = activeJobID === job.id && analysisReady;
+            const disabled = job.status !== "ok" || busy || analysisWorking;
+            const openItem = () => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id));
             return (
               <article
                 key={job.id}
                 className={`aq-item ${isActive ? "aq-item--active" : ""} ${
                   analysisReady ? "aq-item--ready" : ""
-                }`}
+                } ${disabled ? "aq-item--disabled" : ""}`}
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-disabled={disabled}
+                onClick={() => !disabled && openItem()}
+                onKeyDown={(event) => {
+                  if ((event.key === "Enter" || event.key === " ") && !disabled) {
+                    event.preventDefault();
+                    openItem();
+                  }
+                }}
               >
                 <div className="aq-item-top">
                   <span className={`aq-status-dot aq-status-dot--${analysisStatus}`} aria-hidden />
@@ -719,19 +768,24 @@ function AnalysisQueue({ jobs, analyzingJobID, onViewAnalysis, onAnalyze, active
                     )}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className={`aq-action-btn ${
-                    analysisReady ? "aq-action-btn--ready" : "aq-action-btn--run"
-                  }`}
-                  onClick={() => (analysisReady ? onViewAnalysis(job.id) : onAnalyze(job.id))}
-                  disabled={job.status !== "ok" || busy || analysisWorking}
-                >
-                  {busy || analysisWorking ? (
-                    <span className="aq-spinner" />
-                  ) : null}
-                  {analysisButtonLabel(job, busy)}
-                </button>
+                {job.crawl_progress && (
+                  <div className="aq-item-crawl">
+                    <span>Đã cào {job.crawl_progress.places_crawled} địa điểm · {job.crawl_progress.reviews_crawled} review</span>
+                  </div>
+                )}
+                <div className="aq-item-footer">
+                  <span className={`aq-item-status aq-item-status--${analysisStatus}`}>
+                    {analysisStatusText(analysisStatus)}
+                  </span>
+                  <span
+                    className={`aq-item-cta ${
+                      analysisReady ? "aq-item-cta--ready" : "aq-item-cta--run"
+                    }`}
+                  >
+                    {busy || analysisWorking ? <span className="aq-spinner" /> : null}
+                    {analysisButtonLabel(job, busy)}
+                  </span>
+                </div>
               </article>
             );
           })
@@ -753,6 +807,7 @@ export default function App() {
   const [analysisMode, setAnalysisMode] = useState("area");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisJobID, setAnalysisJobID] = useState("");
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
   const [analyzingJobID, setAnalyzingJobID] = useState("");
   const [jobToDelete, setJobToDelete] = useState(null);
 
@@ -777,12 +832,6 @@ export default function App() {
     [activeTab, jobs]
   );
 
-  const completedJobs = useMemo(() => jobs.filter((job) => job.status === "ok"), [jobs]);
-  const workingJobs = useMemo(() => jobs.filter((job) => job.status === "working" || job.status === "pending"), [jobs]);
-  const analysisReadyJobs = useMemo(
-    () => jobs.filter((job) => (job.analysis_status || "pending") === "ok"),
-    [jobs]
-  );
   const analysisJobs = useMemo(
     () =>
       jobs.filter((job) => {
@@ -852,12 +901,12 @@ export default function App() {
         name: form.name.trim(),
         url_mode: form.urlMode,
         lang: form.lang.trim() || "vi",
-        zoom: Number(form.zoom),
+        zoom: 15,
         lat: form.lat.trim(),
         lon: form.lon.trim(),
         fast_mode: false,
         radius: Number(form.radius),
-        depth: Number(form.depth),
+        depth: 50,
         max_places: Number(form.maxPlaces),
         extra_reviews: true,
         max_time_seconds: Number(form.maxTimeSeconds),
@@ -919,11 +968,13 @@ export default function App() {
         setAnalysisResult(data.result);
         setAnalysisJobID(jobID);
         setActiveScreen("analysis");
+        setAnalysisModalOpen(true);
         setMessage("Đã tải kết quả phân tích.");
       } else {
         setAnalysisResult(null);
         setAnalysisJobID(jobID);
         setActiveScreen("analysis");
+        setAnalysisModalOpen(false);
         setMessage(`Trạng thái phân tích: ${analysisStatusText(data?.status?.status)}.`);
       }
     } catch (err) {
@@ -932,6 +983,15 @@ export default function App() {
       setAnalyzingJobID("");
     }
   }
+
+  useEffect(() => {
+    if (!analysisModalOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setAnalysisModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [analysisModalOpen]);
 
   return (
     <div className="app-shell">
@@ -953,7 +1013,7 @@ export default function App() {
           className={activeScreen === "analysis" ? "active" : ""}
           onClick={() => setActiveScreen("analysis")}
         >
-          Phân Tích & Insights
+          Phân tích
         </button>
         <button
           type="button"
@@ -972,47 +1032,15 @@ export default function App() {
       )}
 
       {activeScreen === "analysis" ? (
-        <>
-          <SummaryMetrics
-            jobs={jobs}
-            completedJobs={completedJobs}
-            analysisReadyJobs={analysisReadyJobs}
-            workingJobs={workingJobs}
+        <main className="analysis-screen">
+          <AnalysisQueue
+            jobs={analysisJobs}
+            analyzingJobID={analyzingJobID}
+            onViewAnalysis={onViewAnalysis}
+            onAnalyze={onAnalyze}
+            activeJobID={analysisJobID}
           />
-
-          <div className="analysis-workspace-grid">
-            {/* Left: Job Queue (compact, scrollable) */}
-            <aside className="analysis-queue-sidebar">
-              <AnalysisQueue
-                jobs={analysisJobs}
-                analyzingJobID={analyzingJobID}
-                onViewAnalysis={onViewAnalysis}
-                onAnalyze={onAnalyze}
-                activeJobID={analysisJobID}
-              />
-            </aside>
-
-            {/* Right: Dashboard or empty state — always visible */}
-            <div className="analysis-dashboard-pane">
-              {analysisResult ? (
-                <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />
-              ) : (
-                <section className="panel empty-analysis-workspace">
-                  <div className="empty-analysis-icon-title">
-                    <p className="eyebrow">Không gian phân tích</p>
-                    <h2>Chọn một Snapshot ABSA để mở Dashboard</h2>
-                  </div>
-                  <span className="empty-analysis-description">
-                    {selectedAnalysisJob
-                      ? `${selectedAnalysisJob.name}: ${analysisStatusText(selectedAnalysisJob.analysis_status)}`
-                      : "Chọn một job đã phân tích ở bên trái để xem kết quả ABSA — aspect score, pain points, places ranking và review dẫn chứng."}
-                  </span>
-                </section>
-              )}
-            </div>
-          </div>
-        </>
-
+        </main>
       ) : (
         <>
           <main className="workspace-grid crawler-screen">
@@ -1048,25 +1076,6 @@ export default function App() {
                 <label className="field">
                   <span>Ngôn ngữ</span>
                   <input value={form.lang} onChange={(e) => updateField("lang", e.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Độ sâu cào (Depth)</span>
-                  <input
-                    type="number"
-                    value={form.depth}
-                    onChange={(e) => updateField("depth", e.target.value)}
-                    min={1}
-                  />
-                </label>
-                <label className="field">
-                  <span>Độ thu phóng (Zoom)</span>
-                  <input
-                    type="number"
-                    value={form.zoom}
-                    onChange={(e) => updateField("zoom", e.target.value)}
-                    min={0}
-                    max={21}
-                  />
                 </label>
                 <label className="field">
                   <span>Bán kính tìm (m)</span>
@@ -1135,6 +1144,7 @@ export default function App() {
               apiKey={vietMapApiKey}
               onPick={handleMapPick}
               selectedLocation={selectedLocation}
+              radius={Number(form.radius) || 0}
             />
           </main>
 
@@ -1198,6 +1208,11 @@ export default function App() {
                           <td className="job-name">{job.name}</td>
                           <td>
                             <span className={`status ${job.status}`}>{statusText(job.status)}</span>
+                            {job.crawl_progress && (
+                              <small className="crawl-progress">
+                                Đã cào {job.crawl_progress.places_crawled} địa điểm · {job.crawl_progress.reviews_crawled} review
+                              </small>
+                            )}
                           </td>
                           <td>
                             <span className={`status analysis-status ${analysisStatus}`}>{analysisStatusText(analysisStatus)}</span>
@@ -1245,6 +1260,39 @@ export default function App() {
             </div>
           </section>
         </>
+      )}
+
+      {analysisModalOpen && analysisResult && (
+        <div
+          className="analysis-modal-backdrop"
+          onClick={() => setAnalysisModalOpen(false)}
+        >
+          <div
+            className="analysis-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Dashboard phân tích ABSA"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="analysis-modal-header">
+              <div>
+                <p className="eyebrow">Không gian phân tích</p>
+                <h2>{selectedAnalysisJob?.name || "Dashboard ABSA"}</h2>
+              </div>
+              <button
+                type="button"
+                className="analysis-modal-close"
+                aria-label="Đóng"
+                onClick={() => setAnalysisModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="analysis-modal-body">
+              <AnalysisDashboard result={analysisResult} jobID={analysisJobID} />
+            </div>
+          </div>
+        </div>
       )}
 
       {jobToDelete && (

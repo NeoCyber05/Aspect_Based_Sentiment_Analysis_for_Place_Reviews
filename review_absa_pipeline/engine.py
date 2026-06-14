@@ -67,6 +67,12 @@ class AnalysisEngine:
             "source_column": batch.source_column,
             "domain": route_dict,
             "reviews": reviews,
+            "review_count": batch.review_count,
+            "review_rating": batch.review_rating,
+            "reviews_per_rating": batch.reviews_per_rating,
+            "open_hours": batch.open_hours,
+            "latitude": batch.latitude,
+            "longitude": batch.longitude,
         }
 
     @staticmethod

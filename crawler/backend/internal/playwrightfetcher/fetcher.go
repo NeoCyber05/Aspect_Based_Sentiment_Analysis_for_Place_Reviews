@@ -3,6 +3,7 @@ package playwrightfetcher
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -36,11 +37,19 @@ func New(opts Options) (*Fetcher, error) {
 		opts.PoolSize = 1
 	}
 
-	if err := playwright.Install(&playwright.RunOptions{
-		Browsers: []string{"chromium"},
-		Verbose:  true,
-	}); err != nil {
-		return nil, err
+	// In Docker the driver (node) and chromium are baked into the image at the
+	// paths given by PLAYWRIGHT_DRIVER_PATH / PLAYWRIGHT_BROWSERS_PATH, so skip
+	// the per-job install that would otherwise hit the CDN at runtime — that
+	// download can yield a node binary that does not match the container
+	// architecture and fails to exec. Outside Docker (local dev) the flag is
+	// unset, so we still auto-install chromium as before.
+	if os.Getenv("CRAWLER_PLAYWRIGHT_PREINSTALLED") == "" {
+		if err := playwright.Install(&playwright.RunOptions{
+			Browsers: []string{"chromium"},
+			Verbose:  true,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	pw, err := playwright.Run()

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { SentimentBar } from "./SentimentBar";
-import { NarrativePanel } from "./NarrativePanel";
 import { aspectDisplayName } from "../utils/aspectDisplay";
-import { generateJobNarrative } from "../api";
+import { AnalysisMap } from "./AnalysisMap";
 
 function formatDate(isoString) {
   const date = new Date(isoString);
@@ -19,11 +18,6 @@ function percentText(value) {
 
 function visibleAspects(aspects) {
   return (Array.isArray(aspects) ? aspects : []).filter((item) => Number(item.mentions || 0) > 0);
-}
-
-function domainSummaryRows(summary) {
-  const domains = summary?.domains || {};
-  return Object.entries(domains).map(([domain, metrics]) => ({ domain, ...metrics }));
 }
 
 // ── Sentiment Donut Ring ─────────────────────────────────────────
@@ -130,14 +124,14 @@ const INSIGHT_CONFIG = [
     getSub: (r) => `${r?.description_count || 0} review hợp lệ`,
   },
   {
-    key: "mismatch",
-    label: "Lệch sao/nội dung",
-    icon: "◈",
+    key: "avgRating",
+    label: "Điểm đánh giá TB",
+    icon: "★",
     accent: "var(--dash-amber)",
     bg: "rgba(245,158,11,0.08)",
     border: "rgba(245,158,11,0.2)",
-    getValue: (r) => r?.rating_vs_text?.mismatch_count || 0,
-    getSub: (r) => `${r?.rating_vs_text?.total_with_rating || 0} review có rating`,
+    getValue: (r) => scoreText(r?.global_adjusted_avg_rating ?? r?.global_review_rating_mean ?? 0),
+    getSub: (r) => `${r?.total_review_count || 0} review trên Google`,
   },
 ];
 
@@ -209,116 +203,39 @@ function AspectGrid({ aspects }) {
   );
 }
 
-// ── Alerts Panel ─────────────────────────────────────────────────
-function AlertsPanel({ alerts }) {
-  const rows = Array.isArray(alerts) ? alerts : [];
-  if (rows.length === 0) {
-    return <p className="dash-empty">Chưa có cảnh báo tiêu cực nổi bật.</p>;
-  }
+// ── Rating Distribution Bar ──────────────────────────────────────
+function RatingDistribution({ distribution, max }) {
+  const entries = Object.entries(distribution || {})
+    .map(([rating, count]) => ({ rating: Number(rating), count: Number(count) || 0 }))
+    .sort((a, b) => a.rating - b.rating);
+  const peak = max || Math.max(...entries.map((e) => e.count), 1);
 
   return (
-    <div className="dash-alerts-list">
-      {rows.slice(0, 8).map((item, i) => {
-        const negPct = Number(item.negative_percent || 0);
-        const severity = negPct >= 70 ? "high" : negPct >= 45 ? "medium" : "low";
-        return (
-          <article key={item.aspect} className={`dash-alert-item dash-alert-item--${severity}`}>
-            <div className="dash-alert-rank">#{i + 1}</div>
-            <div className="dash-alert-body">
-              <strong>{aspectDisplayName(item)}</strong>
-              <span>{item.negative || 0} / {item.mentions || 0} tiêu cực</span>
-            </div>
-            <div className="dash-alert-pct">
-              <span className="dash-alert-pct-val">{percentText(item.negative_percent)}</span>
-              <div className="dash-alert-bar">
-                <div className="dash-alert-bar-fill" style={{ width: `${Math.min(100, negPct)}%` }} />
-              </div>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Domain Summary ───────────────────────────────────────────────
-function DomainSummary({ summary }) {
-  const rows = domainSummaryRows(summary);
-  const lowConfidence = Array.isArray(summary?.low_confidence) ? summary.low_confidence : [];
-  if (rows.length === 0) return <p className="dash-empty">Chưa có thông tin ngành hàng.</p>;
-
-  return (
-    <div className="dash-domain-section">
-      <div className="dash-domain-grid">
-        {rows.map((item) => (
-          <article key={item.domain} className="dash-domain-card">
-            <div className="dash-domain-name">{item.domain}</div>
-            <div className="dash-domain-stats">
-              <span><strong>{item.place_count || 0}</strong> địa điểm</span>
-              <span><strong>{item.review_count || 0}</strong> reviews</span>
-            </div>
-            <div className="dash-domain-confidence">
-              <div className="dash-domain-conf-bar">
-                <div
-                  className="dash-domain-conf-fill"
-                  style={{ width: `${Math.min(100, Number(item.avg_confidence || 0) * 100)}%` }}
-                />
-              </div>
-              <span>Confidence {Number(item.avg_confidence || 0).toFixed(2)}</span>
-            </div>
-          </article>
-        ))}
-      </div>
-      {lowConfidence.length > 0 && (
-        <details className="dash-low-confidence">
-          <summary>⚠ {lowConfidence.length} địa điểm cần kiểm tra domain routing</summary>
-          <div className="dash-low-conf-list">
-            {lowConfidence.slice(0, 8).map((item) => (
-              <span key={`${item.input_id}-${item.domain}`}>
-                {item.title || item.input_id}: <em>{item.domain}</em> ({Number(item.confidence || 0).toFixed(2)})
-              </span>
-            ))}
+    <div className="dash-rating-distribution">
+      {entries.map(({ rating, count }) => (
+        <div key={rating} className="dash-rating-dist-row">
+          <span className="dash-rating-dist-label">{rating}★</span>
+          <div className="dash-rating-dist-bar">
+            <div
+              className="dash-rating-dist-fill"
+              style={{ width: `${Math.min(100, (count / peak) * 100)}%` }}
+            />
           </div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-// ── Rating vs Text Mismatch ──────────────────────────────────────
-function RatingMismatch({ data }) {
-  const examples = Array.isArray(data?.examples) ? data.examples : [];
-  if (examples.length === 0) {
-    return <p className="dash-empty">Không có review lệch sao đáng kể.</p>;
-  }
-
-  return (
-    <div className="dash-mismatch-list">
-      {examples.slice(0, 5).map((item, index) => (
-        <blockquote key={`${item.input_id}-${index}`} className="dash-mismatch-quote">
-          <p>{item.text}</p>
-          <footer>
-            <span className="dash-mismatch-place">{item.title || item.input_id}</span>
-            <span className="dash-mismatch-rating">⭐ {item.rating} sao</span>
-            {item.negative_aspects?.length > 0 && (
-              <span className="dash-mismatch-aspects">
-                Tiêu cực: {item.negative_aspects.map(aspectDisplayName).join(", ")}
-              </span>
-            )}
-          </footer>
-        </blockquote>
+          <span className="dash-rating-dist-count">{count}</span>
+        </div>
       ))}
     </div>
   );
 }
 
 // ── Place Analysis Cards ─────────────────────────────────────────
-function PlaceCard({ place, index }) {
+function PlaceCard({ place, index, onViewOnMap }) {
   const [expanded, setExpanded] = useState(false);
   const aspects = visibleAspects(place.aspects);
-  const overall = place.overall || {};
-  const score = Number(overall.score_5 || 0);
-  const scoreColor = score >= 4 ? "#22c55e" : score >= 3 ? "#f59e0b" : "#ef4444";
+  const rawRating = place.review_rating;
+  const adjusted = place.adjusted_avg_rating ?? rawRating ?? 0;
+  const hasCoords = place.latitude !== undefined && place.latitude !== null && place.longitude !== undefined && place.longitude !== null;
+  const scoreColor = adjusted >= 4 ? "#22c55e" : adjusted >= 3 ? "#f59e0b" : "#ef4444";
 
   return (
     <article className="dash-place-card">
@@ -333,14 +250,14 @@ function PlaceCard({ place, index }) {
           <div>
             <strong className="dash-place-name">{place.title || `Địa điểm ${index + 1}`}</strong>
             <span className="dash-place-meta">
-              {place.description_count || 0} review có nội dung
-              {place.domain?.domain ? ` · ${place.domain.domain}` : ""}
+              {place.category || "Không rõ danh mục"}
+              {place.review_count ? ` · ${place.review_count} review` : ""}
             </span>
           </div>
         </div>
         <div className="dash-place-header-right">
           <span className="dash-place-score" style={{ color: scoreColor }}>
-            {scoreText(overall.score_5)}
+            {scoreText(adjusted)}
           </span>
           <span className="dash-place-expand-icon">{expanded ? "▲" : "▼"}</span>
         </div>
@@ -348,6 +265,29 @@ function PlaceCard({ place, index }) {
 
       {expanded && (
         <div className="dash-place-body">
+          <div className="dash-place-score-section">
+            <div className="dash-place-score-block">
+              <span className="dash-place-score-label">Điểm đánh giá trung bình</span>
+              <strong className="dash-place-score-main" style={{ color: scoreColor }}>
+                {scoreText(adjusted)}
+              </strong>
+              {rawRating !== undefined && rawRating !== null && (
+                <span className="dash-place-score-raw">Google: {scoreText(rawRating)}</span>
+              )}
+            </div>
+            <RatingDistribution distribution={place.reviews_per_rating} />
+          </div>
+
+          {hasCoords && (
+            <button
+              type="button"
+              className="dash-view-map-btn"
+              onClick={() => onViewOnMap?.(place.input_id || place.title)}
+            >
+              📍 Xem trên bản đồ
+            </button>
+          )}
+
           {Array.isArray(place.top_negative_aspects) && place.top_negative_aspects.length > 0 && (
             <div className="dash-place-negatives">
               <span className="dash-place-section-label">Điểm tiêu cực nổi bật</span>
@@ -397,13 +337,18 @@ function PlaceCard({ place, index }) {
   );
 }
 
-function PlaceAnalysisList({ places }) {
+function PlaceAnalysisList({ places, onViewOnMap }) {
   const rows = Array.isArray(places) ? places : [];
   if (rows.length === 0) return <p className="dash-empty">Không có dữ liệu địa điểm.</p>;
   return (
     <div className="dash-place-list">
       {rows.map((place, index) => (
-        <PlaceCard key={place.input_id || `${place.title}-${index}`} place={place} index={index} />
+        <PlaceCard
+          key={place.input_id || `${place.title}-${index}`}
+          place={place}
+          index={index}
+          onViewOnMap={onViewOnMap}
+        />
       ))}
     </div>
   );
@@ -413,28 +358,26 @@ function PlaceAnalysisList({ places }) {
 const TABS = [
   { id: "overview", label: "Tổng quan", icon: "◉" },
   { id: "aspects", label: "Khía cạnh", icon: "◈" },
-  { id: "alerts", label: "Cảnh báo", icon: "⚠" },
   { id: "places", label: "Địa điểm", icon: "⬡" },
-  { id: "domain", label: "Ngành hàng", icon: "▣" },
-  { id: "mismatch", label: "Lệch sao", icon: "◆" },
+  { id: "map", label: "Bản đồ", icon: "⌖" },
 ];
 
 // ── Main Dashboard ───────────────────────────────────────────────
 export function AnalysisDashboard({ result, jobID }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedPlaceId, setSelectedPlaceId] = useState(null);
 
   const placesCount = result?.places?.length || 0;
   const aspectsCount = visibleAspects(result?.aspects).length;
-  const alertsCount = result?.alerts?.length || 0;
-  const domainsCount = domainSummaryRows(result?.domain_summary).length;
-  const mismatchCount = result?.rating_vs_text?.mismatch_count || 0;
 
   const tabCounts = {
     aspects: aspectsCount,
-    alerts: alertsCount,
     places: placesCount,
-    domain: domainsCount,
-    mismatch: mismatchCount,
+  };
+
+  const handleViewOnMap = (placeId) => {
+    setSelectedPlaceId(placeId);
+    setActiveTab("map");
   };
 
   return (
@@ -483,12 +426,6 @@ export function AnalysisDashboard({ result, jobID }) {
           {activeTab === "overview" && (
             <div className="dash-section">
               <div className="dash-section-header">
-                <h3>Tổng quan cảm xúc</h3>
-                <span>Phân tích diễn giải từ Ollama</span>
-              </div>
-              <NarrativePanel jobID={jobID} onGenerate={generateJobNarrative} />
-
-              <div className="dash-section-header" style={{ marginTop: "28px" }}>
                 <h3>Top khía cạnh nổi bật</h3>
                 <button
                   type="button"
@@ -512,43 +449,23 @@ export function AnalysisDashboard({ result, jobID }) {
             </div>
           )}
 
-          {activeTab === "alerts" && (
-            <div className="dash-section">
-              <div className="dash-section-header">
-                <h3>Vấn đề cần ưu tiên</h3>
-                <span>{alertsCount} cảnh báo tiêu cực</span>
-              </div>
-              <AlertsPanel alerts={result?.alerts} />
-            </div>
-          )}
-
           {activeTab === "places" && (
             <div className="dash-section">
               <div className="dash-section-header">
                 <h3>Phân tích theo địa điểm</h3>
-                <span>{placesCount} địa điểm · Click để xem chi tiết</span>
+                <span>{placesCount} địa điểm · Click để xem chi tiết · Ấn “Xem trên bản đồ” để định vị</span>
               </div>
-              <PlaceAnalysisList places={result?.places} />
+              <PlaceAnalysisList places={result?.places} onViewOnMap={handleViewOnMap} />
             </div>
           )}
 
-          {activeTab === "domain" && (
+          {activeTab === "map" && (
             <div className="dash-section">
-              <div className="dash-section-header">
-                <h3>Ngành hàng (Domain Routing)</h3>
-                <span>{domainsCount} ngành hàng được phát hiện</span>
-              </div>
-              <DomainSummary summary={result?.domain_summary} />
-            </div>
-          )}
-
-          {activeTab === "mismatch" && (
-            <div className="dash-section">
-              <div className="dash-section-header">
-                <h3>Lệch giữa rating và nội dung</h3>
-                <span>{mismatchCount} review có dấu hiệu lệch</span>
-              </div>
-              <RatingMismatch data={result?.rating_vs_text} />
+              <AnalysisMap
+                places={result?.places || []}
+                selectedPlaceId={selectedPlaceId}
+                onSelectPlace={setSelectedPlaceId}
+              />
             </div>
           )}
         </div>

@@ -26,10 +26,14 @@ class NarrativeRequest(BaseModel):
 def create_app(engine: AnalysisEngine | None = None):
     app = FastAPI(title="ABSA Review Analysis Service")
     analysis_engine = engine
+    if analysis_engine is None:
+        analysis_engine = AnalysisEngine(model_manager=ModelManager())
+        analysis_engine.model_manager.preload()
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        loaded = analysis_engine.model_manager.loaded_domains
+        return {"status": "ok", "models_loaded": ", ".join(loaded) if loaded else "none"}
 
     @app.post("/v1/analyze-csv")
     def analyze_csv(req: AnalyzeCSVRequest) -> dict[str, Any]:

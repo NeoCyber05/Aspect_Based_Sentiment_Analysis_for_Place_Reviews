@@ -37,28 +37,34 @@ type apiError struct {
 	Message string `json:"message"`
 }
 
+type crawlProgress struct {
+	PlacesCrawled  int `json:"places_crawled"`
+	ReviewsCrawled int `json:"reviews_crawled"`
+}
+
 type jobResponse struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	CreatedAt         string   `json:"created_at"`
-	Status            string   `json:"status"`
-	AnalysisStatus    string   `json:"analysis_status"`
-	AnalysisUpdatedAt string   `json:"analysis_updated_at,omitempty"`
-	AnalysisError     string   `json:"analysis_error,omitempty"`
-	Keywords          []string `json:"keywords"`
-	URLMode           bool     `json:"url_mode"`
-	Lang              string   `json:"lang"`
-	Zoom              int      `json:"zoom"`
-	Lat               string   `json:"lat"`
-	Lon               string   `json:"lon"`
-	FastMode          bool     `json:"fast_mode"`
-	Radius            int      `json:"radius"`
-	Depth             int      `json:"depth"`
-	MaxPlaces         int      `json:"max_places"`
-	ExtraReviews      bool     `json:"extra_reviews"`
-	MaxTimeSeconds    int      `json:"max_time_seconds"`
-	Proxies           []string `json:"proxies"`
-	CrawlMode         string   `json:"crawl_mode"`
+	ID                string         `json:"id"`
+	Name              string         `json:"name"`
+	CreatedAt         string         `json:"created_at"`
+	Status            string         `json:"status"`
+	AnalysisStatus    string         `json:"analysis_status"`
+	AnalysisUpdatedAt string         `json:"analysis_updated_at,omitempty"`
+	AnalysisError     string         `json:"analysis_error,omitempty"`
+	CrawlProgress     *crawlProgress `json:"crawl_progress,omitempty"`
+	Keywords          []string       `json:"keywords"`
+	URLMode           bool           `json:"url_mode"`
+	Lang              string         `json:"lang"`
+	Zoom              int            `json:"zoom"`
+	Lat               string         `json:"lat"`
+	Lon               string         `json:"lon"`
+	FastMode          bool           `json:"fast_mode"`
+	Radius            int            `json:"radius"`
+	Depth             int            `json:"depth"`
+	MaxPlaces         int            `json:"max_places"`
+	ExtraReviews      bool           `json:"extra_reviews"`
+	MaxTimeSeconds    int            `json:"max_time_seconds"`
+	Proxies           []string       `json:"proxies"`
+	CrawlMode         string         `json:"crawl_mode"`
 }
 
 func (r *createJobRequest) normalize() {

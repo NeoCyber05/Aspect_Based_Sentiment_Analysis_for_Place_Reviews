@@ -47,7 +47,7 @@ func createReadyJobWithCSV(t *testing.T, server *httpServer, dataDir string) str
 		t.Fatalf("failed to create job: %v", err)
 	}
 
-	csvPath := filepath.Join(dataDir, job.ID+".csv")
+	csvPath := filepath.Join(dataDir, web.CsvFileName(job))
 	if err := os.WriteFile(csvPath, []byte("title,user_reviews\nCafe,[]\n"), 0o600); err != nil {
 		t.Fatalf("failed to write csv: %v", err)
 	}

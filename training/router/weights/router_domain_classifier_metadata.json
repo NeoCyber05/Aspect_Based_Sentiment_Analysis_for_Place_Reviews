@@ -1,5 +1,5 @@
 {
-  "data_path": "router_merged.csv",
+  "data_path": "router_merged_3domains.csv",
   "model_path": "weights\\router_domain_classifier.joblib",
   "features": [
     "title",
@@ -9,20 +9,19 @@
   "labels": [
     "hospital",
     "hotel",
-    "restaurant",
-    "university"
+    "restaurant"
   ],
   "random_state": 42,
   "test_size": 0.2,
   "cv": "StratifiedKFold(n_splits=5, shuffle=True, random_state=42)",
   "scoring": "f1_macro",
-  "best_cv_macro_f1": 0.9984904175359036,
+  "best_cv_macro_f1": 0.9976453303503645,
   "best_params": {
-    "clf__C": 3.0,
+    "clf__C": 0.3,
     "clf__class_weight": "balanced",
     "features__category_tfidf__ngram_range": [
       1,
-      1
+      2
     ],
     "features__title_tfidf__min_df": 1,
     "features__title_tfidf__ngram_range": [
