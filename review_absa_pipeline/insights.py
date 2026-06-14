@@ -62,7 +62,6 @@ def _rating_mismatches(place_results: list[dict[str, Any]], limit: int = 10) -> 
                 continue
             examples.append(
                 {
-                    "input_id": place.get("input_id", ""),
                     "title": place.get("title", ""),
                     "rating": rating,
                     "text": review.get("text", ""),
@@ -101,7 +100,6 @@ def _domain_summary(place_results: list[dict[str, Any]]) -> dict[str, Any]:
         if confidence < 0.6 or domain.get("fallback"):
             low_confidence.append(
                 {
-                    "input_id": place.get("input_id", ""),
                     "title": place.get("title", ""),
                     "domain": domain_name,
                     "confidence": round(confidence, 3),
@@ -261,10 +259,8 @@ def build_analysis_result(
 
         places.append(
             {
-                "input_id": place.get("input_id", ""),
                 "title": place.get("title", ""),
                 "category": place.get("category", ""),
-                "address": place.get("address", ""),
                 "domain": place.get("domain", {}),
                 "description_count": len(reviews),
                 "overall": summarize_overall(summary),

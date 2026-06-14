@@ -52,10 +52,8 @@ class FixedRouter:
 def write_crawled_csv(path: Path) -> None:
     rows = [
         {
-            "input_id": "place-1",
             "title": "Cafe Test",
             "category": "Cafe",
-            "address": "Ha Noi",
             "user_reviews": json.dumps(
                 [
                     {
@@ -80,10 +78,8 @@ def write_crawled_csv(path: Path) -> None:
         writer = csv.DictWriter(
             file,
             fieldnames=[
-                "input_id",
                 "title",
                 "category",
-                "address",
                 "user_reviews",
                 "user_reviews_extended",
             ],
@@ -359,7 +355,6 @@ class ReviewAnalysisTests(unittest.TestCase):
 
         self.assertEqual(len(batches), 1)
         self.assertEqual(batches[0].category, "Cafe")
-        self.assertEqual(batches[0].address, "Ha Noi")
         self.assertEqual(batches[0].descriptions, ["Service was slow and staff ignored us"])
         self.assertEqual(len(batches[0].reviews), 1)
         self.assertEqual(batches[0].reviews[0].rating, 1)
@@ -371,10 +366,8 @@ class ReviewAnalysisTests(unittest.TestCase):
             csv_path = Path(tmp) / "large_reviews.csv"
             long_description = "dịch vụ tốt " * 15000
             row = {
-                "input_id": "place-large",
                 "title": "Cafe Large",
                 "category": "Cafe",
-                "address": "Ha Noi",
                 "user_reviews": "",
                 "user_reviews_extended": json.dumps(
                     [
@@ -396,7 +389,7 @@ class ReviewAnalysisTests(unittest.TestCase):
             batches = load_place_review_batches(csv_path)
 
         self.assertEqual(len(batches), 1)
-        self.assertEqual(batches[0].input_id, "place-large")
+        self.assertEqual(batches[0].title, "Cafe Large")
         self.assertEqual(batches[0].source_column, "user_reviews_extended")
         self.assertEqual(batches[0].reviews[0].text, long_description.strip())
 

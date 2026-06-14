@@ -282,7 +282,7 @@ function PlaceCard({ place, index, onViewOnMap }) {
             <button
               type="button"
               className="dash-view-map-btn"
-              onClick={() => onViewOnMap?.(place.input_id || place.title)}
+              onClick={() => onViewOnMap?.(place.title)}
             >
               📍 Xem trên bản đồ
             </button>
@@ -321,7 +321,7 @@ function PlaceCard({ place, index, onViewOnMap }) {
             <div className="dash-place-evidence">
               <span className="dash-place-section-label">Review dẫn chứng</span>
               {place.evidence.slice(0, 2).map((item, evidenceIndex) => (
-                <blockquote key={`${place.input_id || index}-${evidenceIndex}`} className="dash-evidence-quote">
+                <blockquote key={`${place.title || index}-${evidenceIndex}`} className="dash-evidence-quote">
                   <p>{item.text}</p>
                   <footer>
                     {item.rating ? `⭐ ${item.rating} sao` : "Không có rating"}
@@ -344,7 +344,7 @@ function PlaceAnalysisList({ places, onViewOnMap }) {
     <div className="dash-place-list">
       {rows.map((place, index) => (
         <PlaceCard
-          key={place.input_id || `${place.title}-${index}`}
+          key={place.title || `${index}`}
           place={place}
           index={index}
           onViewOnMap={onViewOnMap}

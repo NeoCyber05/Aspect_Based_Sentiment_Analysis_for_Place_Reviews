@@ -60,10 +60,8 @@ class AnalysisEngine:
             for index, review in enumerate(batch.reviews)
         ]
         return {
-            "input_id": batch.input_id,
             "title": batch.title,
             "category": batch.category,
-            "address": batch.address,
             "source_column": batch.source_column,
             "domain": route_dict,
             "reviews": reviews,

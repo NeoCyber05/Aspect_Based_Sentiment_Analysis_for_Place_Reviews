@@ -38,12 +38,10 @@ class ReviewRecord:
 
 @dataclass
 class PlaceReviewBatch:
-    input_id: str
     title: str
     source_column: str
     descriptions: list[str]
     category: str = ""
-    address: str = ""
     reviews: list[ReviewRecord] = field(default_factory=list)
     review_count: int | None = None
     review_rating: float | None = None
@@ -225,12 +223,10 @@ def load_place_review_batches(csv_path: str | Path) -> list[PlaceReviewBatch]:
             descriptions = [_text_from_review(review) for review in reviews]
             results.append(
                 PlaceReviewBatch(
-                    input_id=str(row.get("input_id", "")).strip(),
                     title=str(row.get("title") or row.get("name") or "").strip(),
                     source_column=source_column,
                     descriptions=descriptions,
                     category=str(row.get("category", "")).strip(),
-                    address=str(row.get("address", "")).strip(),
                     reviews=reviews,
                     review_count=int(float(row.get("review_count") or 0)) or None,
                     review_rating=_parse_float(row.get("review_rating")),

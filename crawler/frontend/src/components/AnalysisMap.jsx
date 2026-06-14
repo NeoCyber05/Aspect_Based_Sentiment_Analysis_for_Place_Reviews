@@ -108,8 +108,8 @@ export function AnalysisMap({ places, selectedPlaceId, onSelectPlace }) {
       const lng = parseCoordinate(place.longitude);
       const rating = place.adjusted_avg_rating ?? place.review_rating;
       const color = getMarkerColor(rating);
-      const isSelected = place.input_id === selectedPlaceId || place.title === selectedPlaceId;
-      const placeId = place.input_id || place.title;
+      const isSelected = place.title === selectedPlaceId;
+      const placeId = place.title;
 
       const el = document.createElement("div");
       el.className = `dash-map-marker ${isSelected ? "dash-map-marker--selected" : ""}`;
@@ -149,7 +149,7 @@ export function AnalysisMap({ places, selectedPlaceId, onSelectPlace }) {
     if (!map || mapState !== "ready" || !selectedPlaceId) return;
 
     const place = placesWithCoords.find(
-      (p) => p.input_id === selectedPlaceId || p.title === selectedPlaceId
+      (p) => p.title === selectedPlaceId
     );
     if (!place) return;
 
